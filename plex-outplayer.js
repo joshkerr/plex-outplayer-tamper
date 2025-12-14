@@ -714,6 +714,8 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			} else if (DOMObserver.observeRetries < DOMObserver.maxObserveRetries) {
 				DOMObserver.observeRetries++;
 				setTimeout(DOMObserver.observe, DOMObserver.retryDelayMS);
+			} else {
+				errorHandle("Could not start DOM observer; target nodes missing after retries.");
 			}
 		}
 	};
