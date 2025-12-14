@@ -699,22 +699,25 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	DOMObserver.observeRetries = 0;
 	DOMObserver.maxObserveRetries = 10;
 	DOMObserver.retryDelayMS = 50;
-	DOMObserver.resetRetries = function() {
-		DOMObserver.observeRetries = 0;
-	};
+	DOMObserver.waitingForDomReady = false;
 	
 	DOMObserver.observe = function() {
 		const target = document.body || document.documentElement;
 		if (target) {
-			DOMObserver.resetRetries();
+			DOMObserver.waitingForDomReady = false;
+			DOMObserver.observeRetries = 0;
 			DOMObserver.mo.observe(target, { childList : true, subtree : true });
 		} else {
-			if (document.readyState !== "complete") {
-				document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
+			if (document.readyState === "loading") {
+				if (!DOMObserver.waitingForDomReady) {
+					DOMObserver.waitingForDomReady = true;
+					document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
+				}
 			} else if (DOMObserver.observeRetries < DOMObserver.maxObserveRetries) {
 				DOMObserver.observeRetries++;
 				setTimeout(DOMObserver.observe, DOMObserver.retryDelayMS);
 			} else {
+				DOMObserver.waitingForDomReady = false;
 				errorHandle("Could not start DOM observer; target nodes missing after retries.");
 			}
 		}
