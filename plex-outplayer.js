@@ -698,7 +698,12 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	DOMObserver.mo = new MutationObserver(DOMObserver.callback);
 	
 	DOMObserver.observe = function() {
-		DOMObserver.mo.observe(document.body, { childList : true, subtree : true });
+		const target = document.body || document.documentElement;
+		if (target) {
+			DOMObserver.mo.observe(target, { childList : true, subtree : true });
+		} else {
+			document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
+		}
 	};
 	
 	DOMObserver.stop = function() {
@@ -1263,12 +1268,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}
 		
 		// URL matches, observe the DOM for when the injection point loads
-		// Also handle readyState if this is the page we start on
-		if (document.readyState === "loading") {
-			document.addEventListener("DOMContentLoaded", DOMObserver.observe);
-		} else {
-			DOMObserver.observe();
-		}
+		DOMObserver.observe();
 		
 		// Create empty media entry early
 		serverData.updateMediaDirectly(urlIds.clientId, urlIds.metadataId, {});
