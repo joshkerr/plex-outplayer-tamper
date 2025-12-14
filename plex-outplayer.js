@@ -658,8 +658,6 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	// The observer object that waits for page to be right to inject new functionality
 	const DOMObserver = {};
-	const observerMaxRetries = 10;
-	const observerRetryDelayMS = 50;
 	
 	// Check to see if we need to modify the DOM, do so if yes
 	DOMObserver.callback = async function() {
@@ -699,19 +697,23 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	DOMObserver.mo = new MutationObserver(DOMObserver.callback);
 	DOMObserver.observeRetries = 0;
-	DOMObserver.maxObserveRetries = observerMaxRetries;
+	DOMObserver.maxObserveRetries = 10;
+	DOMObserver.retryDelayMS = 50;
+	DOMObserver.resetRetries = function() {
+		DOMObserver.observeRetries = 0;
+	};
 	
 	DOMObserver.observe = function() {
 		const target = document.body || document.documentElement;
 		if (target) {
-			DOMObserver.observeRetries = 0;
+			DOMObserver.resetRetries();
 			DOMObserver.mo.observe(target, { childList : true, subtree : true });
 		} else {
-			if (document.readyState === "loading") {
+			if (document.readyState !== "complete") {
 				document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
 			} else if (DOMObserver.observeRetries < DOMObserver.maxObserveRetries) {
 				DOMObserver.observeRetries++;
-				setTimeout(DOMObserver.observe, observerRetryDelayMS);
+				setTimeout(DOMObserver.observe, DOMObserver.retryDelayMS);
 			}
 		}
 	};
