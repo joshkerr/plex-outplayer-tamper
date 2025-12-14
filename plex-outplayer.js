@@ -702,7 +702,11 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		if (target) {
 			DOMObserver.mo.observe(target, { childList : true, subtree : true });
 		} else {
-			document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
+			if (document.readyState === "loading") {
+				document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
+			} else {
+				requestAnimationFrame(DOMObserver.observe);
+			}
 		}
 	};
 	
