@@ -700,8 +700,6 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	DOMObserver.mo = new MutationObserver(DOMObserver.callback);
 	DOMObserver.observeRetries = 0;
-	DOMObserver.maxObserveRetries = DOM_OBSERVER_MAX_RETRIES;
-	DOMObserver.retryDelayMS = DOM_OBSERVER_RETRY_DELAY_MS;
 	DOMObserver.waitingForDomReady = false;
 	
 	DOMObserver.observe = function() {
@@ -722,13 +720,13 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		
 		DOMObserver.waitingForDomReady = false;
 		
-		if (DOMObserver.observeRetries < DOMObserver.maxObserveRetries) {
+		if (DOMObserver.observeRetries < DOM_OBSERVER_MAX_RETRIES) {
 			DOMObserver.observeRetries++;
-			setTimeout(DOMObserver.observe, DOMObserver.retryDelayMS);
+			setTimeout(DOMObserver.observe, DOM_OBSERVER_RETRY_DELAY_MS);
 			return;
 		}
 		
-		errorHandle(`Could not start DOM observer; target nodes missing after ${DOMObserver.maxObserveRetries} retries.`);
+		errorHandle(`Could not start DOM observer; target nodes missing after ${DOM_OBSERVER_MAX_RETRIES} retries.`);
 	};
 	
 	DOMObserver.stop = function() {
