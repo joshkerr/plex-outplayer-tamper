@@ -696,16 +696,20 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	};
 	
 	DOMObserver.mo = new MutationObserver(DOMObserver.callback);
+	DOMObserver.observeRetries = 0;
+	DOMObserver.maxObserveRetries = 10;
 	
 	DOMObserver.observe = function() {
 		const target = document.body || document.documentElement;
 		if (target) {
+			DOMObserver.observeRetries = 0;
 			DOMObserver.mo.observe(target, { childList : true, subtree : true });
 		} else {
 			if (document.readyState === "loading") {
 				document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
-			} else {
-				requestAnimationFrame(DOMObserver.observe);
+			} else if (DOMObserver.observeRetries < DOMObserver.maxObserveRetries) {
+				DOMObserver.observeRetries++;
+				setTimeout(DOMObserver.observe, 50);
 			}
 		}
 	};
