@@ -703,6 +703,10 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	DOMObserver.waitingForDomReady = false;
 	
 	DOMObserver.observe = function() {
+		if (DOMObserver.waitingForDomReady && document.readyState !== "loading") {
+			DOMObserver.waitingForDomReady = false;
+		}
+		
 		const target = document.body || document.documentElement;
 		if (target) {
 			DOMObserver.waitingForDomReady = false;
