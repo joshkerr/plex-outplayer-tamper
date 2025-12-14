@@ -658,6 +658,9 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	// The observer object that waits for page to be right to inject new functionality
 	const DOMObserver = {};
+	// Limit how aggressively we retry attaching the observer when the DOM isn't ready
+	const DOM_OBSERVER_MAX_RETRIES = 10;
+	const DOM_OBSERVER_RETRY_DELAY_MS = 50; // Small delay to wait for DOM nodes to appear
 	
 	// Check to see if we need to modify the DOM, do so if yes
 	DOMObserver.callback = async function() {
@@ -697,8 +700,8 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	DOMObserver.mo = new MutationObserver(DOMObserver.callback);
 	DOMObserver.observeRetries = 0;
-	DOMObserver.maxObserveRetries = 10;
-	DOMObserver.retryDelayMS = 50;
+	DOMObserver.maxObserveRetries = DOM_OBSERVER_MAX_RETRIES;
+	DOMObserver.retryDelayMS = DOM_OBSERVER_RETRY_DELAY_MS;
 	DOMObserver.waitingForDomReady = false;
 	
 	DOMObserver.observe = function() {
@@ -707,20 +710,26 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			DOMObserver.waitingForDomReady = false;
 			DOMObserver.observeRetries = 0;
 			DOMObserver.mo.observe(target, { childList : true, subtree : true });
-		} else {
-			if (document.readyState === "loading") {
-				if (!DOMObserver.waitingForDomReady) {
-					DOMObserver.waitingForDomReady = true;
-					document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
-				}
-			} else if (DOMObserver.observeRetries < DOMObserver.maxObserveRetries) {
-				DOMObserver.observeRetries++;
-				setTimeout(DOMObserver.observe, DOMObserver.retryDelayMS);
-			} else {
-				DOMObserver.waitingForDomReady = false;
-				errorHandle("Could not start DOM observer; target nodes missing after retries.");
-			}
+			return;
 		}
+		
+		if (document.readyState === "loading") {
+			if (!DOMObserver.waitingForDomReady) {
+				DOMObserver.waitingForDomReady = true;
+				document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
+			}
+			return;
+		}
+		
+		DOMObserver.waitingForDomReady = false;
+		
+		if (DOMObserver.observeRetries < DOMObserver.maxObserveRetries) {
+			DOMObserver.observeRetries++;
+			setTimeout(DOMObserver.observe, DOMObserver.retryDelayMS);
+			return;
+		}
+		
+		errorHandle("Could not start DOM observer; target nodes missing after retries.");
 	};
 	
 	DOMObserver.stop = function() {
