@@ -714,10 +714,9 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}
 		
 		if (document.readyState === "loading") {
-			if (!DOMObserver.waitingForDomReady) {
-				DOMObserver.waitingForDomReady = true;
-				document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
-			}
+			if (DOMObserver.waitingForDomReady) return;
+			DOMObserver.waitingForDomReady = true;
+			document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
 			return;
 		}
 		
@@ -729,7 +728,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			return;
 		}
 		
-		errorHandle("Could not start DOM observer; target nodes missing after retries.");
+		errorHandle(`Could not start DOM observer; target nodes missing after ${DOMObserver.maxObserveRetries} retries.`);
 	};
 	
 	DOMObserver.stop = function() {
