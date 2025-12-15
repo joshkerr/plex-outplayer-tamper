@@ -658,6 +658,9 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	// The observer object that waits for page to be right to inject new functionality
 	const DOMObserver = {};
+	// Limit how aggressively we retry attaching the observer when the DOM isn't ready
+	const DOM_OBSERVER_MAX_RETRIES = 10;
+	const DOM_OBSERVER_RETRY_DELAY_MS = 50; // Small delay to wait for DOM nodes to appear
 	
 	// Check to see if we need to modify the DOM, do so if yes
 	DOMObserver.callback = async function() {
@@ -696,9 +699,35 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	};
 	
 	DOMObserver.mo = new MutationObserver(DOMObserver.callback);
+	DOMObserver.observeRetries = 0;
+	DOMObserver.waitingForDomReady = false;
 	
 	DOMObserver.observe = function() {
-		DOMObserver.mo.observe(document.body, { childList : true, subtree : true });
+		if (document.readyState !== "loading") {
+			DOMObserver.waitingForDomReady = false;
+		}
+		
+		const target = document.body || document.documentElement;
+		if (target) {
+			DOMObserver.observeRetries = 0;
+			DOMObserver.mo.observe(target, { childList : true, subtree : true });
+			return;
+		}
+		
+		if (document.readyState === "loading") {
+			if (DOMObserver.waitingForDomReady) return;
+			DOMObserver.waitingForDomReady = true;
+			document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
+			return;
+		}
+		
+		if (DOMObserver.observeRetries < DOM_OBSERVER_MAX_RETRIES) {
+			DOMObserver.observeRetries++;
+			setTimeout(DOMObserver.observe, DOM_OBSERVER_RETRY_DELAY_MS);
+			return;
+		}
+		
+		errorHandle(`Could not start DOM observer; target nodes missing after ${DOM_OBSERVER_MAX_RETRIES} retries.`);
 	};
 	
 	DOMObserver.stop = function() {
@@ -1263,12 +1292,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}
 		
 		// URL matches, observe the DOM for when the injection point loads
-		// Also handle readyState if this is the page we start on
-		if (document.readyState === "loading") {
-			document.addEventListener("DOMContentLoaded", DOMObserver.observe);
-		} else {
-			DOMObserver.observe();
-		}
+		DOMObserver.observe();
 		
 		// Create empty media entry early
 		serverData.updateMediaDirectly(urlIds.clientId, urlIds.metadataId, {});
