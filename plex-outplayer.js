@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Plex Outplayer
-// @description  Adds an Outplayer button to the Plex desktop interface. Plays media directly in Outplayer for iOS. Works on episodes, movies, whole seasons, and entire shows.
+// @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer or SenPlayer for iOS. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.8.0
+// @version      1.9.0
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -34,7 +34,49 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	const injectionElement    = "button[data-testid=preplay-play]"; // Play button
 	const injectPosition      = "after";
 	const domElementStyle     = "";
-	const domElementInnerHTML = "<svg style='height:1.5rem; width:1.5rem; margin:0 4px 0 0;'><g><path d='M8 5v14l11-7z' fill='currentcolor'></path></g></svg>Outplayer";
+
+	// Player configurations
+	const players = {
+		outplayer: {
+			name: "Outplayer",
+			// Outplayer uses x-callback-url format
+			buildUri: function(uri) {
+				const encodedUri = encodeURIComponent(uri);
+				return `outplayer://x-callback-url/play?url=${encodedUri}`;
+			}
+		},
+		senplayer: {
+			name: "SenPlayer",
+			// SenPlayer uses direct URL format (like VLC)
+			buildUri: function(uri) {
+				return `senplayer://${uri}`;
+			}
+		}
+	};
+
+	// Default player and localStorage key
+	const playerStorageKey = `${domPrefix}selectedPlayer`;
+	let selectedPlayer = localStorage.getItem(playerStorageKey) || "outplayer";
+
+	// Ensure selected player is valid
+	if (!players[selectedPlayer]) {
+		selectedPlayer = "outplayer";
+	}
+
+	function getSelectedPlayerName() {
+		return players[selectedPlayer].name;
+	}
+
+	function setSelectedPlayer(playerKey) {
+		if (players[playerKey]) {
+			selectedPlayer = playerKey;
+			localStorage.setItem(playerStorageKey, playerKey);
+		}
+	}
+
+	function getDomElementInnerHTML() {
+		return `<svg style='height:1.5rem; width:1.5rem; margin:0 4px 0 0;'><g><path d='M8 5v14l11-7z' fill='currentcolor'></path></g></svg>${getSelectedPlayerName()}`;
+	}
 	
 	
 	
@@ -322,7 +364,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		
 		<${domPrefix}element id="${domPrefix}modal_overlay">
 			<${domPrefix}element id="${domPrefix}modal_popup" role="dialog" aria-modal="true" aria-labelledby="${domPrefix}modal_title" aria-describedby="${domPrefix}modal_downloaddescription">
-				<${domPrefix}element id="${domPrefix}modal_title">Play in Outplayer: </${domPrefix}element>
+				<${domPrefix}element id="${domPrefix}modal_title">Play in External Player: </${domPrefix}element>
 				<input type="button" id="${domPrefix}modal_topx" value="&#x2715;" aria-label="close" title="Close" tabindex="0"/>
 				
 				<input type="hidden" id="${domPrefix}modal_clientid" tabindex="-1"/>
@@ -353,8 +395,12 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 				</${domPrefix}element>
 				
 				<${domPrefix}element id="${domPrefix}modal_downloaddescription"></${domPrefix}element>
-				
-				<${domPrefix}element>
+
+				<${domPrefix}element style="display:flex; gap:0.5em; align-items:center; justify-content:center;">
+					<label for="${domPrefix}modal_playerselector" style="margin-right:0.3em;">Player:</label>
+					<select id="${domPrefix}modal_playerselector" tabindex="0" style="padding:0.2em 0.5em; border-radius:4px; background:#0008; color:#eee; border:1px solid #5555; font-size:12pt; cursor:pointer;">
+						<!-- Options populated dynamically -->
+					</select>
 					<input type="button" id="${domPrefix}modal_downloadbutton" value="Play" tabindex="0"/>
 				</${domPrefix}element>
 			</${domPrefix}element>
@@ -390,11 +436,23 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	modal.clientId            = modal.getElementByIdSuffix("modal_clientid");
 	modal.parentId            = modal.getElementByIdSuffix("modal_parentid");
 	modal.downloadDescription = modal.getElementByIdSuffix("modal_downloaddescription");
+	modal.playerSelector      = modal.getElementByIdSuffix("modal_playerselector");
 	modal.itemTemplate        = modal.getElementByIdSuffix("modal_item_template");
-	
+
+	// Populate player selector with available players
+	for (let playerKey in players) {
+		let option = document.createElement("option");
+		option.value = playerKey;
+		option.textContent = players[playerKey].name;
+		if (playerKey === selectedPlayer) {
+			option.selected = true;
+		}
+		modal.playerSelector.appendChild(option);
+	}
+
 	// Live updating collection of items
 	modal.itemCheckboxes = modal.itemContainer.getElementsByClassName(`${domPrefix}modal_item_checkbox`);
-	
+
 	modal.firstTab = modal.topX;
 	modal.lastTab  = modal.downloadButton;
 	
@@ -526,10 +584,26 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		for (let checkbox of modal.itemCheckboxes) {
 			checkbox.checked = modal.checkAll.checked;
 		}
-		
+
 		modal.checkBoxChange();
 	});
-	
+
+	// Handle player selection change
+	modal.playerSelector.addEventListener("change", function() {
+		setSelectedPlayer(modal.playerSelector.value);
+		// Update the main button text if it exists
+		const mainButton = document.getElementById(`${domPrefix}ExternalPlayerButton`);
+		if (mainButton) {
+			mainButton.innerHTML = getDomElementInnerHTML();
+		}
+		// Update modal title
+		const clientId = modal.clientId.value;
+		const metadataId = modal.parentId.value;
+		if (clientId && metadataId && serverData.servers[clientId]?.mediaData[metadataId]) {
+			modal.title.textContent = `Play in ${getSelectedPlayerName()}: ${serverData.servers[clientId].mediaData[metadataId].title}`;
+		}
+	});
+
 	modal.downloadChecked = function() {
 		let clientId = modal.clientId.value;
 		for (let checkbox of modal.itemCheckboxes) {
@@ -621,7 +695,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 				let itemTitle = titles.slice(1).join(", "); 
 				
 				// Set hover title
-				item.elementId["modal_item_label"].title = `Play ${itemTitle} in Outplayer`;
+				item.elementId["modal_item_label"].title = `Play ${itemTitle} in ${getSelectedPlayerName()}`;
 				
 				// Fill fields in table cells
 				item.elementId["modal_item_title"].textContent = itemTitle;
@@ -643,7 +717,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		})(metadataId, []);
 		
 		// Set the modal title
-		modal.title.textContent = `Play in Outplayer: ${serverData.servers[clientId].mediaData[metadataId].title}`;
+		modal.title.textContent = `Play in ${getSelectedPlayerName()}: ${serverData.servers[clientId].mediaData[metadataId].title}`;
 		
 		// Hidden values required for the button to work
 		// Also help detect if we don't need to repopulate the modal
@@ -683,7 +757,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}
 		
 		// Make sure we don't ever double trigger for any reason
-		if (document.getElementById(`${domPrefix}OutplayerButton`)) {
+		if (document.getElementById(`${domPrefix}ExternalPlayerButton`)) {
 			return;
 		}
 		
@@ -1315,15 +1389,13 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	// Live collection of frames
 	download.frames = document.getElementsByClassName(download.frameClass);
 	
-	// Open a URL in Outplayer
+	// Open a URL in the selected external player
 	download.fromUri = function(uri, filename) {
-		// URL encode the uri for Outplayer
-		const encodedUri = encodeURIComponent(uri);
-		// Create the correct Outplayer URL scheme with x-callback-url
-		const outplayerUri = `outplayer://x-callback-url/play?url=${encodedUri}`;
+		// Build the player-specific URI using the selected player's configuration
+		const playerUri = players[selectedPlayer].buildUri(uri);
 
-		// Open in a new window that will be redirected to Outplayer app
-		window.open(outplayerUri, '_blank');
+		// Open in a new window that will be redirected to the player app
+		window.open(playerUri, '_blank');
 	};
 	
 	// Clean up old DOM elements from previous downloads, if needed
@@ -1339,23 +1411,24 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		const key         = serverData.servers[clientId].mediaData[metadataId].key;
 		const baseUri     = serverData.servers[clientId].baseUri;
 		const accessToken = serverData.servers[clientId].accessToken;
+		const playerName  = getSelectedPlayerName();
 
 		const url = new URL(`${baseUri}${key}`);
 
 		url.searchParams.set("X-Plex-Token", accessToken);
-		// Using download URL for Outplayer to preserve audio tracks
+		// Using download URL to preserve audio tracks
 		url.searchParams.set("download", "1");
 		// Force selection of the default audio track
 		url.searchParams.set("audioStreamID", "1");
 
 		// Add player state parameters to help Plex track viewing progress
 		url.searchParams.set("X-Plex-Platform", "iOS");
-		url.searchParams.set("X-Plex-Client-Identifier", "Outplayer");
+		url.searchParams.set("X-Plex-Client-Identifier", playerName);
 		url.searchParams.set("X-Plex-Client-Platform", "iOS");
 		url.searchParams.set("X-Plex-Device", "iPhone");
-		url.searchParams.set("X-Plex-Device-Name", "Outplayer");
+		url.searchParams.set("X-Plex-Device-Name", playerName);
 		url.searchParams.set("playback", "start");
-		url.searchParams.set("session", `outplayer-${Date.now()}`);
+		url.searchParams.set("session", `${selectedPlayer}-${Date.now()}`);
 
 		return url.href;
 	};
@@ -1423,8 +1496,8 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	function modifyDom(injectionPoint) {
 		// Clone the tag of the injection point element
 		const downloadButton = document.createElement(injectionPoint.tagName);
-		downloadButton.id = `${domPrefix}OutplayerButton`;
-		downloadButton.innerHTML = domElementInnerHTML;
+		downloadButton.id = `${domPrefix}ExternalPlayerButton`;
+		downloadButton.innerHTML = getDomElementInnerHTML();
 		
 		// Steal CSS from the injection point element by copying its class name
 		downloadButton.className = `${domPrefix}element ${injectionPoint.className}`;
@@ -1514,13 +1587,79 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			}
 		};
 		domElement.addEventListener("click", downloadFunction);
-		
+
+		// Right-click to show player selection context menu
+		domElement.addEventListener("contextmenu", function(event) {
+			event.preventDefault();
+			event.stopPropagation();
+
+			// Remove any existing context menu
+			const existingMenu = document.getElementById(`${domPrefix}playerContextMenu`);
+			if (existingMenu) {
+				existingMenu.remove();
+			}
+
+			// Create context menu
+			const menu = document.createElement(`${domPrefix}element`);
+			menu.id = `${domPrefix}playerContextMenu`;
+			menu.style.cssText = `
+				position: fixed;
+				left: ${event.clientX}px;
+				top: ${event.clientY}px;
+				background: #3f3f42;
+				border-radius: 6px;
+				box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+				z-index: 99999;
+				padding: 0.3em 0;
+				min-width: 120px;
+			`;
+
+			// Add player options
+			for (let playerKey in players) {
+				const option = document.createElement(`${domPrefix}element`);
+				option.style.cssText = `
+					display: block;
+					padding: 0.5em 1em;
+					cursor: pointer;
+					color: ${playerKey === selectedPlayer ? '#1394e1' : '#eee'};
+					font-weight: ${playerKey === selectedPlayer ? 'bold' : 'normal'};
+				`;
+				option.textContent = players[playerKey].name;
+				option.addEventListener("mouseenter", function() {
+					this.style.background = '#555';
+				});
+				option.addEventListener("mouseleave", function() {
+					this.style.background = 'transparent';
+				});
+				option.addEventListener("click", function(e) {
+					e.stopPropagation();
+					setSelectedPlayer(playerKey);
+					domElement.innerHTML = getDomElementInnerHTML();
+					menu.remove();
+				});
+				menu.appendChild(option);
+			}
+
+			document.body.appendChild(menu);
+
+			// Close menu when clicking elsewhere
+			const closeMenu = function(e) {
+				if (!menu.contains(e.target)) {
+					menu.remove();
+					document.removeEventListener("click", closeMenu);
+				}
+			};
+			setTimeout(() => document.addEventListener("click", closeMenu), 0);
+		});
+
 		// Add the filesize on hover, if available
 		if (Object.hasOwn(serverData.servers[clientId].mediaData[metadataId], "filesize")) {
 			let filesize = makeFilesize(serverData.servers[clientId].mediaData[metadataId].filesize);
-			domElement.title = filesize;
+			domElement.title = `${filesize} (right-click to change player)`;
+		} else {
+			domElement.title = "Right-click to change player";
 		}
-		
+
 		return true;
 	}
 	
