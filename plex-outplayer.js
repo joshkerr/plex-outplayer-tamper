@@ -719,6 +719,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}
 		
 		DOMObserver.waitingForDomReady = false;
+		document.removeEventListener("DOMContentLoaded", DOMObserver.observe);
 		
 		if (DOMObserver.observeRetries < DOM_OBSERVER_MAX_RETRIES) {
 			DOMObserver.observeRetries++;
