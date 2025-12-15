@@ -2,7 +2,7 @@
 // @name         Plex Outplayer
 // @description  Adds an Outplayer button to the Plex desktop interface. Plays media directly in Outplayer for iOS. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.8.0
+// @version      1.8.1
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -52,7 +52,9 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		senplayer : {
 			label    : "Senplayer",
 			buildUri : function(uri) {
-				return `senplayer://play?url=${encodeURIComponent(uri)}`;
+				// Provide both url and mediaUrl parameters to maximize compatibility
+				const encoded = encodeURIComponent(uri);
+				return `senplayer://play?url=${encoded}&mediaUrl=${encoded}`;
 			}
 		},
 	};
