@@ -34,9 +34,285 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	const injectionElement    = "button[data-testid=preplay-play]"; // Play button
 	const injectPosition      = "after";
 	const domElementStyle     = "";
-	const domElementInnerHTML = "<svg style='height:1.5rem; width:1.5rem; margin:0 4px 0 0;'><g><path d='M8 5v14l11-7z' fill='currentcolor'></path></g></svg>Outplayer";
+	const domElementInnerHTML = `<svg style='height:1.5rem; width:1.5rem; margin:0 4px 0 0;'><g><path d='M8 5v14l11-7z' fill='currentcolor'></path></g></svg><span data-${domPrefix}player-label>Outplayer</span>`;
+	
+	const playerOptions = {
+		outplayer : {
+			label    : "Outplayer",
+			buildUri : function(uri) {
+				return `outplayer://x-callback-url/play?url=${encodeURIComponent(uri)}`;
+			}
+		},
+		vlc : {
+			label    : "VLC",
+			buildUri : function(uri) {
+				return `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(uri)}`;
+			}
+		},
+		senplayer : {
+			label    : "Senplayer",
+			buildUri : function(uri) {
+				return `senplayer://play?url=${encodeURIComponent(uri)}`;
+			}
+		},
+	};
+	
+	const playerSettings = {
+		storageKey   : "plex-outplayer-preferred-player",
+		defaultPlayer: "outplayer",
+		buttons      : new Set(),
+		get() {
+			const saved = window.localStorage.getItem(this.storageKey);
+			if (saved && Object.hasOwn(playerOptions, saved)) {
+				return saved;
+			}
+			return this.defaultPlayer;
+		},
+		getLabel(playerId) {
+			const id = playerId || this.get();
+			if (Object.hasOwn(playerOptions, id)) {
+				return playerOptions[id].label;
+			}
+			return playerOptions[this.defaultPlayer].label;
+		},
+		set(playerId) {
+			if (!Object.hasOwn(playerOptions, playerId)) {
+				return;
+			}
+			window.localStorage.setItem(this.storageKey, playerId);
+			this.updateButtons();
+		},
+		buildLaunchUri(uri) {
+			const playerId = this.get();
+			const builder = Object.hasOwn(playerOptions, playerId) ? playerOptions[playerId].buildUri : playerOptions[this.defaultPlayer].buildUri;
+			return builder(uri);
+		},
+		registerButton(button) {
+			this.buttons.add(button);
+			this.updateButton(button);
+		},
+		updateButton(button) {
+			if (!button) {
+				return;
+			}
+			let label = button.querySelector(`[data-${domPrefix}player-label]`);
+			if (label) {
+				label.textContent = this.getLabel();
+			}
+			button.title = `Play in ${this.getLabel()}`;
+		},
+		updateButtons() {
+			for (let button of this.buttons) {
+				this.updateButton(button);
+			}
+		},
+	};
 	
 	
+	
+	// Simple configuration modal to pick which player should receive the stream URL
+	const playerConfig = {};
+	playerConfig.documentFragment = document.createDocumentFragment();
+	playerConfig.container = document.createElement(`${domPrefix}element`);
+	playerConfig.documentFragment.append(playerConfig.container);
+	playerConfig.container.id = `${domPrefix}config_container`;
+	
+	playerConfig.stylesheet = `
+		#${domPrefix}config_container {
+			width: 0;
+			height: 0;
+		}
+		
+		#${domPrefix}config_overlay {
+			width: 100%;
+			height: 100%;
+			position: fixed;
+			top: 0;
+			left: 0;
+			z-index: 99991;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: #0007;
+			opacity: 0;
+			pointer-events: none;
+			transition: opacity 0.2s ease-out;
+		}
+		
+		#${domPrefix}config_overlay.${domPrefix}open {
+			opacity: 1;
+			pointer-events: auto;
+		}
+		
+		#${domPrefix}config_panel {
+			min-width: min(90%, 420px);
+			display: flex;
+			flex-direction: column;
+			gap: 0.8em;
+			padding: 1em 1.3em;
+			border-radius: 12px;
+			background: #3f3f42;
+			text-align: left;
+			box-shadow: 0 0 10px 1px black;
+			position: relative;
+			transform: translateY(-12%);
+			transition: transform 0.2s ease-out;
+		}
+		
+		#${domPrefix}config_overlay.${domPrefix}open #${domPrefix}config_panel {
+			transform: translateY(0);
+		}
+		
+		#${domPrefix}config_title {
+			font-size: 15pt;
+			font-weight: 600;
+		}
+		
+		#${domPrefix}config_options {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5em;
+		}
+		
+		#${domPrefix}config_options label {
+			display: flex;
+			align-items: center;
+			gap: 0.6em;
+			padding: 0.4em 0.6em;
+			border-radius: 6px;
+			cursor: pointer;
+			transition: background 0.15s;
+		}
+		
+		#${domPrefix}config_options label:hover {
+			background: #bdf2;
+			color: #000;
+		}
+		
+		#${domPrefix}config_actions {
+			display: flex;
+			justify-content: flex-end;
+			gap: 0.6em;
+		}
+		
+		#${domPrefix}config_actions input[type="button"] {
+			padding: 0.4em 0.8em;
+			border-radius: 6px;
+			border: 1px solid #5555;
+			background: #0008;
+			color: #eee;
+			cursor: pointer;
+		}
+		
+		#${domPrefix}config_actions input[type="button"]:hover {
+			background: #14161a78;
+		}
+	`;
+	
+	playerConfig.container.innerHTML = `
+		<style>${playerConfig.stylesheet}</style>
+		<${domPrefix}element id="${domPrefix}config_overlay" role="dialog" aria-modal="true" aria-labelledby="${domPrefix}config_title">
+			<${domPrefix}element id="${domPrefix}config_panel">
+				<${domPrefix}element id="${domPrefix}config_title">Choose a player</${domPrefix}element>
+				<${domPrefix}element id="${domPrefix}config_options"></${domPrefix}element>
+				<${domPrefix}element id="${domPrefix}config_actions">
+					<input type="button" id="${domPrefix}config_cancel" value="Cancel"/>
+					<input type="button" id="${domPrefix}config_save" value="Save"/>
+				</${domPrefix}element>
+			</${domPrefix}element>
+		</${domPrefix}element>
+	`;
+	
+	playerConfig.getElementByIdSuffix = function(idSuffix) {
+		return playerConfig.container.querySelector(`#${domPrefix}${idSuffix}`);
+	};
+	
+	playerConfig.overlay    = playerConfig.getElementByIdSuffix("config_overlay");
+	playerConfig.options    = playerConfig.getElementByIdSuffix("config_options");
+	playerConfig.saveButton = playerConfig.getElementByIdSuffix("config_save");
+	playerConfig.cancel     = playerConfig.getElementByIdSuffix("config_cancel");
+	playerConfig.radioName  = `${domPrefix}player_choice`;
+	playerConfig.initialized = false;
+	
+	playerConfig.populateOptions = function() {
+		playerConfig.initialized = true;
+		while (playerConfig.options.firstChild) {
+			playerConfig.options.firstChild.remove();
+		}
+		
+		let current = playerSettings.get();
+		let firstRadio = null;
+		for (let [playerId, playerData] of Object.entries(playerOptions)) {
+			let label = document.createElement("label");
+			label.setAttribute("for", `${domPrefix}config_radio_${playerId}`);
+			
+			let radio = document.createElement("input");
+			radio.type = "radio";
+			radio.name = playerConfig.radioName;
+			radio.value = playerId;
+			radio.id = `${domPrefix}config_radio_${playerId}`;
+			radio.checked = (current === playerId);
+			
+			if (!firstRadio) {
+				firstRadio = radio;
+			}
+			
+			let text = document.createElement("span");
+			text.textContent = playerData.label;
+			
+			label.append(radio, text);
+			playerConfig.options.append(label);
+		}
+		
+		playerConfig.firstRadio = firstRadio;
+	};
+	
+	playerConfig.syncSelection = function() {
+		if (!playerConfig.initialized) {
+			playerConfig.populateOptions();
+			return;
+		}
+		const current = playerSettings.get();
+		for (let radio of playerConfig.options.querySelectorAll(`input[name="${playerConfig.radioName}"]`)) {
+			radio.checked = (radio.value === current);
+		}
+	};
+	
+	playerConfig.handleKeydown = function(event) {
+		if (event.key === "Escape") {
+			playerConfig.close();
+		}
+	};
+	
+	playerConfig.open = function() {
+		if (playerConfig.overlay.classList.contains(`${domPrefix}open`)) {
+			return;
+		}
+		playerConfig.syncSelection();
+		document.body.append(playerConfig.container);
+		window.addEventListener("keydown", playerConfig.handleKeydown, { capture : true });
+		requestAnimationFrame(() => {
+			playerConfig.overlay.classList.add(`${domPrefix}open`);
+			(playerConfig.options.querySelector(`input[name="${playerConfig.radioName}"]:checked`) || playerConfig.firstRadio || playerConfig.saveButton).focus();
+		});
+	};
+	
+	playerConfig.close = function() {
+		window.removeEventListener("keydown", playerConfig.handleKeydown, { capture : true });
+		playerConfig.overlay.classList.remove(`${domPrefix}open`);
+		playerConfig.documentFragment.append(playerConfig.container);
+	};
+	
+	playerConfig.overlay.addEventListener("click", playerConfig.close);
+	playerConfig.getElementByIdSuffix("config_panel").addEventListener("click", function(event) { event.stopPropagation(); });
+	playerConfig.cancel.addEventListener("click", playerConfig.close);
+	playerConfig.saveButton.addEventListener("click", function() {
+		let selected = playerConfig.options.querySelector(`input[name="${playerConfig.radioName}"]:checked`);
+		if (selected) {
+			playerSettings.set(selected.value);
+		}
+		playerConfig.close();
+	});
 	
 	// Should not be visible in normal operation
 	const errorLog = [];
@@ -322,7 +598,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		
 		<${domPrefix}element id="${domPrefix}modal_overlay">
 			<${domPrefix}element id="${domPrefix}modal_popup" role="dialog" aria-modal="true" aria-labelledby="${domPrefix}modal_title" aria-describedby="${domPrefix}modal_downloaddescription">
-				<${domPrefix}element id="${domPrefix}modal_title">Play in Outplayer: </${domPrefix}element>
+				<${domPrefix}element id="${domPrefix}modal_title">Play externally: </${domPrefix}element>
 				<input type="button" id="${domPrefix}modal_topx" value="&#x2715;" aria-label="close" title="Close" tabindex="0"/>
 				
 				<input type="hidden" id="${domPrefix}modal_clientid" tabindex="-1"/>
@@ -474,6 +750,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	// Show the modal on screen
 	modal.open = function(clientId, metadataId) {
 		modal.populate(clientId, metadataId);
+		modal.downloadButton.value = `Play in ${playerSettings.getLabel()}`;
 		
 		// Reset all checkboxes
 		for (let checkbox of modal.itemCheckboxes) {
@@ -621,7 +898,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 				let itemTitle = titles.slice(1).join(", "); 
 				
 				// Set hover title
-				item.elementId["modal_item_label"].title = `Play ${itemTitle} in Outplayer`;
+				item.elementId["modal_item_label"].title = `Play ${itemTitle} in ${playerSettings.getLabel()}`;
 				
 				// Fill fields in table cells
 				item.elementId["modal_item_title"].textContent = itemTitle;
@@ -643,7 +920,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		})(metadataId, []);
 		
 		// Set the modal title
-		modal.title.textContent = `Play in Outplayer: ${serverData.servers[clientId].mediaData[metadataId].title}`;
+		modal.title.textContent = `Play in ${playerSettings.getLabel()}: ${serverData.servers[clientId].mediaData[metadataId].title}`;
 		
 		// Hidden values required for the button to work
 		// Also help detect if we don't need to repopulate the modal
@@ -1315,15 +1592,10 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	// Live collection of frames
 	download.frames = document.getElementsByClassName(download.frameClass);
 	
-	// Open a URL in Outplayer
+	// Open a URL in the configured player
 	download.fromUri = function(uri, filename) {
-		// URL encode the uri for Outplayer
-		const encodedUri = encodeURIComponent(uri);
-		// Create the correct Outplayer URL scheme with x-callback-url
-		const outplayerUri = `outplayer://x-callback-url/play?url=${encodedUri}`;
-
-		// Open in a new window that will be redirected to Outplayer app
-		window.open(outplayerUri, '_blank');
+		const playerUri = playerSettings.buildLaunchUri(uri);
+		window.open(playerUri, '_blank');
 	};
 	
 	// Clean up old DOM elements from previous downloads, if needed
@@ -1343,19 +1615,21 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		const url = new URL(`${baseUri}${key}`);
 
 		url.searchParams.set("X-Plex-Token", accessToken);
-		// Using download URL for Outplayer to preserve audio tracks
+		// Using download URL to preserve audio tracks
 		url.searchParams.set("download", "1");
 		// Force selection of the default audio track
 		url.searchParams.set("audioStreamID", "1");
 
 		// Add player state parameters to help Plex track viewing progress
 		url.searchParams.set("X-Plex-Platform", "iOS");
-		url.searchParams.set("X-Plex-Client-Identifier", "Outplayer");
+		const playerId = playerSettings.get();
+		const playerLabel = playerSettings.getLabel(playerId);
+		url.searchParams.set("X-Plex-Client-Identifier", playerLabel);
 		url.searchParams.set("X-Plex-Client-Platform", "iOS");
 		url.searchParams.set("X-Plex-Device", "iPhone");
-		url.searchParams.set("X-Plex-Device-Name", "Outplayer");
+		url.searchParams.set("X-Plex-Device-Name", playerLabel);
 		url.searchParams.set("playback", "start");
-		url.searchParams.set("session", `outplayer-${Date.now()}`);
+		url.searchParams.set("session", `${playerId}-${Date.now()}`);
 
 		return url.href;
 	};
@@ -1425,6 +1699,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		const downloadButton = document.createElement(injectionPoint.tagName);
 		downloadButton.id = `${domPrefix}OutplayerButton`;
 		downloadButton.innerHTML = domElementInnerHTML;
+		playerSettings.registerButton(downloadButton);
 		
 		// Steal CSS from the injection point element by copying its class name
 		downloadButton.className = `${domPrefix}element ${injectionPoint.className}`;
@@ -1476,6 +1751,21 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 				errorHandle(`Invalid injection position: ${injectPosition}`);
 				break;
 		}
+		
+		const configButton = document.createElement(injectionPoint.tagName);
+		configButton.id = `${domPrefix}OutplayerConfigButton`;
+		configButton.className = `${domPrefix}element ${injectionPoint.className}`;
+		configButton.style.cssText = domElementStyle;
+		configButton.textContent = "Player";
+		configButton.disabled = false;
+		configButton.style.opacity = 1;
+		configButton.title = "Choose the player used for playback";
+		configButton.addEventListener("click", function(event) {
+			event.stopPropagation();
+			playerConfig.open();
+		});
+		
+		downloadButton.after(configButton);
 		
 		return downloadButton;
 	}
