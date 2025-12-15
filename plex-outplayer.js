@@ -703,9 +703,12 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	DOMObserver.waitingForDomReady = false;
 	
 	DOMObserver.observe = function() {
+		if (document.readyState !== "loading") {
+			DOMObserver.waitingForDomReady = false;
+		}
+		
 		const target = document.body || document.documentElement;
 		if (target) {
-			DOMObserver.waitingForDomReady = false;
 			DOMObserver.observeRetries = 0;
 			DOMObserver.mo.observe(target, { childList : true, subtree : true });
 			return;
@@ -717,8 +720,6 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			document.addEventListener("DOMContentLoaded", DOMObserver.observe, { once : true });
 			return;
 		}
-		
-		DOMObserver.waitingForDomReady = false;
 		
 		if (DOMObserver.observeRetries < DOM_OBSERVER_MAX_RETRIES) {
 			DOMObserver.observeRetries++;
