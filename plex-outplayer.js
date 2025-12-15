@@ -55,8 +55,8 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}
 	};
 
-	// Default player and localStorage key
-	const playerStorageKey = `${domPrefix}selectedPlayer`;
+	// Default player and localStorage key (use stable key, not random domPrefix)
+	const playerStorageKey = "plexExternalPlayer_selectedPlayer";
 	let selectedPlayer = localStorage.getItem(playerStorageKey) || "outplayer";
 
 	// Ensure selected player is valid
