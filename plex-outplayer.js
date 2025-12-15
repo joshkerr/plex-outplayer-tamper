@@ -2,7 +2,7 @@
 // @name         Plex Outplayer
 // @description  Adds an Outplayer button to the Plex desktop interface. Plays media directly in Outplayer for iOS. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.8.1
+// @version      1.8.2
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -39,22 +39,27 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	const playerOptions = {
 		outplayer : {
 			label    : "Outplayer",
-			buildUri : function(uri) {
+			buildUri : function(uri/*, meta*/) {
 				return `outplayer://x-callback-url/play?url=${encodeURIComponent(uri)}`;
 			}
 		},
 		vlc : {
 			label    : "VLC",
-			buildUri : function(uri) {
+			buildUri : function(uri/*, meta*/) {
 				return `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(uri)}`;
 			}
 		},
 		senplayer : {
 			label    : "Senplayer",
-			buildUri : function(uri) {
-				// Provide both url and mediaUrl parameters to maximize compatibility
+			buildUri : function(uri, meta) {
 				const encoded = encodeURIComponent(uri);
-				return `senplayer://play?url=${encoded}&mediaUrl=${encoded}`;
+				const title = meta && meta.title ? encodeURIComponent(meta.title) : "";
+				// Provide multiple parameter names to maximize compatibility
+				let url = `senplayer://play?url=${encoded}&mediaUrl=${encoded}&link=${encoded}`;
+				if (title) {
+					url += `&title=${title}`;
+				}
+				return url;
 			}
 		},
 	};
@@ -84,10 +89,10 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			window.localStorage.setItem(this.storageKey, playerId);
 			this.updateButtons();
 		},
-		buildLaunchUri(uri) {
+		buildLaunchUri(uri, meta) {
 			const playerId = this.get();
 			const builder = Object.hasOwn(playerOptions, playerId) ? playerOptions[playerId].buildUri : playerOptions[this.defaultPlayer].buildUri;
-			return builder(uri);
+			return builder(uri, meta);
 		},
 		registerButton(button) {
 			this.buttons.add(button);
@@ -1597,7 +1602,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	// Open a URL in the configured player
 	download.fromUri = function(uri, filename) {
 		const playerId = playerSettings.get();
-		const playerUri = playerSettings.buildLaunchUri(uri);
+		const playerUri = playerSettings.buildLaunchUri(uri, { title : filename || "" });
 		// Senplayer handles direct navigation more reliably than popup windows
 		if (playerId === "senplayer") {
 			window.location.href = playerUri;
