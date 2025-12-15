@@ -1594,8 +1594,14 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	// Open a URL in the configured player
 	download.fromUri = function(uri, filename) {
+		const playerId = playerSettings.get();
 		const playerUri = playerSettings.buildLaunchUri(uri);
-		window.open(playerUri, '_blank');
+		// Senplayer handles direct navigation more reliably than popup windows
+		if (playerId === "senplayer") {
+			window.location.href = playerUri;
+		} else {
+			window.open(playerUri, '_blank');
+		}
 	};
 	
 	// Clean up old DOM elements from previous downloads, if needed
