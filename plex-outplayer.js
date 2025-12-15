@@ -47,9 +47,10 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		},
 		senplayer: {
 			name: "SenPlayer",
-			// SenPlayer uses direct URL format (like VLC)
+			// SenPlayer uses x-callback-url format
 			buildUri: function(uri) {
-				return `senplayer://${uri}`;
+				const encodedUri = encodeURIComponent(uri);
+				return `senplayer://x-callback-url/play?url=${encodedUri}`;
 			}
 		}
 	};
