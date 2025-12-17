@@ -13,13 +13,25 @@ MPV requires a URL protocol handler to be registered on your system before it ca
 
 ### macOS
 
-Install the mpv-handler using Homebrew:
+**Prerequisites:** Install MPV first via Homebrew (`brew install mpv`). Verify with `mpv --version`.
+
+**Quick Install:** Download and run the installer script:
 
 ```bash
-brew install stolendata/mpv-handler/mpv-handler
+curl -O https://raw.githubusercontent.com/joshkerr/plex-outplayer-tamper/main/install-mpv-handler-macos.sh
+chmod +x install-mpv-handler-macos.sh
+./install-mpv-handler-macos.sh
 ```
 
-Or manually register the `mpv://` protocol using a third-party tool like [open-mpv](https://github.com/nicetip/open-mpv) or similar.
+Or if you have the repo cloned:
+
+```bash
+./install-mpv-handler-macos.sh
+```
+
+This creates an app bundle at `~/Applications/MPV URL Handler.app` that handles `mpv://` URLs.
+
+**Note:** If macOS blocks the app, go to System Preferences > Security & Privacy and allow it to run.
 
 ### Windows
 
