@@ -1,6 +1,8 @@
 # plex-outplayer-tamper
 Places an external player button on the Plex website to stream videos through Outplayer, SenPlayer, or MPV. This is a Tampermonkey script file. If you right-click on the player button, you can choose the player you want to use. The button will change to reflect the selected player.
 
+The script is a tampermonkey script so it requires the tampermonkey extension to run. You can get this extension for most browsers including Safari on iOS and iPadOS. 
+
 ## Supported Players
 
 - **Outplayer** (iOS) - Works out of the box
