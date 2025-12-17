@@ -18,86 +18,61 @@ fi
 MPV_PATH=$(which mpv)
 echo "Found mpv at: $MPV_PATH"
 
-# Create the app bundle
 APP_NAME="MPV URL Handler"
 APP_DIR="$HOME/Applications/$APP_NAME.app"
-CONTENTS_DIR="$APP_DIR/Contents"
-MACOS_DIR="$CONTENTS_DIR/MacOS"
-RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
 echo "Creating app bundle at: $APP_DIR"
 
 # Clean up existing installation
 rm -rf "$APP_DIR"
 
-# Create directory structure
-mkdir -p "$MACOS_DIR"
-mkdir -p "$RESOURCES_DIR"
+# Create AppleScript source file
+SCRIPT_SOURCE=$(mktemp)
+cat > "$SCRIPT_SOURCE" << 'APPLESCRIPT'
+on open location theURL
+    -- Log for debugging
+    set logFile to (POSIX path of (path to home folder)) & "mpv-handler-debug.log"
+    do shell script "echo '=== '$(date)' ===' >> " & quoted form of logFile
+    do shell script "echo 'Received: " & theURL & "' >> " & quoted form of logFile
 
-# Create the handler script
-cat > "$MACOS_DIR/mpv-handler" << 'HANDLER_SCRIPT'
-#!/bin/bash
-# MPV URL Handler - decodes base64 URL and launches mpv
+    -- Strip 'mpv://b64/' prefix (first 10 characters)
+    set base64Part to text 11 thru -1 of theURL
+    do shell script "echo 'Base64: " & base64Part & "' >> " & quoted form of logFile
 
-URL="$1"
+    -- Decode base64
+    set decodedURL to do shell script "echo " & quoted form of base64Part & " | base64 -d"
+    do shell script "echo 'Decoded: " & decodedURL & "' >> " & quoted form of logFile
 
-# Strip 'mpv://b64/' prefix (10 chars) and decode base64
-BASE64_PART="${URL:10}"
-DECODED_URL=$(echo "$BASE64_PART" | base64 -d 2>/dev/null)
+    -- Launch mpv (try both possible locations)
+    try
+        do shell script "/opt/homebrew/bin/mpv " & quoted form of decodedURL & " >> " & quoted form of logFile & " 2>&1 &"
+    on error
+        try
+            do shell script "/usr/local/bin/mpv " & quoted form of decodedURL & " >> " & quoted form of logFile & " 2>&1 &"
+        on error errMsg
+            do shell script "echo 'Error: " & errMsg & "' >> " & quoted form of logFile
+        end try
+    end try
+end open location
+APPLESCRIPT
 
-if [ -n "$DECODED_URL" ]; then
-    /usr/local/bin/mpv "$DECODED_URL" 2>/dev/null || /opt/homebrew/bin/mpv "$DECODED_URL" 2>/dev/null || mpv "$DECODED_URL"
-else
-    osascript -e "display dialog \"Failed to decode URL\" buttons {\"OK\"} default button \"OK\" with icon stop"
-fi
-HANDLER_SCRIPT
+# Compile AppleScript to app bundle
+osacompile -o "$APP_DIR" "$SCRIPT_SOURCE"
+rm "$SCRIPT_SOURCE"
 
-chmod +x "$MACOS_DIR/mpv-handler"
+# Add URL scheme to Info.plist using PlistBuddy
+PLIST="$APP_DIR/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.plex-outplayer.mpv-handler" "$PLIST" 2>/dev/null || \
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.plex-outplayer.mpv-handler" "$PLIST"
 
-# Create Info.plist
-cat > "$CONTENTS_DIR/Info.plist" << 'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>mpv-handler</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.plex-outplayer.mpv-handler</string>
-    <key>CFBundleName</key>
-    <string>MPV URL Handler</string>
-    <key>CFBundleDisplayName</key>
-    <string>MPV URL Handler</string>
-    <key>CFBundleVersion</key>
-    <string>1.0</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleURLTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleURLName</key>
-            <string>MPV Protocol</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>mpv</string>
-            </array>
-        </dict>
-    </array>
-    <key>LSBackgroundOnly</key>
-    <true/>
-    <key>LSMinimumSystemVersion</key>
-    <string>10.13</string>
-</dict>
-</plist>
-PLIST
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string 'MPV Protocol'" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string mpv" "$PLIST" 2>/dev/null || true
 
-# Register the URL handler by launching the app once
+# Register the URL handler
 echo "Registering URL handler..."
-open "$APP_DIR"
-
-# Force macOS to update URL handlers
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR" 2>/dev/null || true
 
 echo ""
@@ -106,5 +81,5 @@ echo ""
 echo "The handler is installed at: $APP_DIR"
 echo "You can now use MPV as your player in Plex Outplayer."
 echo ""
-echo "Note: If prompted by macOS, allow the app to run in"
-echo "System Preferences > Security & Privacy."
+echo "Testing with: open \"mpv://b64/aHR0cHM6Ly9leGFtcGxlLmNvbQ==\""
+echo "Check ~/mpv-handler-debug.log for output"
