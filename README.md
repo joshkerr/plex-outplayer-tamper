@@ -23,32 +23,43 @@ Or manually register the `mpv://` protocol using a third-party tool like [open-m
 
 ### Windows
 
-**Prerequisites:** Install MPV first via [Chocolatey](https://community.chocolatey.org/packages/mpvio) (`choco install mpvio`) or download from [mpv.io](https://mpv.io/installation/). Make sure `mpv.exe` is in your PATH.
+**Prerequisites:** Install MPV first via [Chocolatey](https://community.chocolatey.org/packages/mpvio) (`choco install mpvio`) or download from [mpv.io](https://mpv.io/installation/). Make sure `mpv.exe` is in your PATH (verify with `mpv --version`).
 
-**Option 1: mpv-url-proto (Recommended)**
+**Quick Install:** Download and run [`install-mpv-handler.bat`](install-mpv-handler.bat) as Administrator.
 
-Download and run the installer from [mpv-url-proto](https://github.com/b01o/mpv-url-proto):
-
-```powershell
-# Download and run the installer (Run as Administrator)
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/b01o/mpv-url-proto/main/mpv-url-proto-install.bat" -OutFile "$env:TEMP\mpv-url-proto-install.bat"; Start-Process -FilePath "$env:TEMP\mpv-url-proto-install.bat" -Verb RunAs
-```
-
-**Option 2: Manual Registry Setup**
-
-Run this PowerShell script as Administrator to register the `mpv://` protocol:
+**Or** run this PowerShell script **as Administrator** to set up the `mpv://` protocol handler:
 
 ```powershell
-# Register mpv:// protocol handler (Run as Administrator)
+# MPV Protocol Handler Setup for Windows (Run as Administrator)
+# This creates a PowerShell-based handler that properly decodes URLs
+
 $mpvPath = (Get-Command mpv.exe -ErrorAction SilentlyContinue).Source
-if (-not $mpvPath) { Write-Error "mpv.exe not found in PATH"; exit 1 }
+if (-not $mpvPath) { Write-Error "mpv.exe not found in PATH. Install MPV first."; exit 1 }
 
+# Create handler script directory
+$handlerDir = "$env:LOCALAPPDATA\mpv-handler"
+New-Item -Path $handlerDir -ItemType Directory -Force | Out-Null
+
+# Create the handler script that decodes the URL and launches MPV
+$handlerScript = @'
+param([string]$url)
+# Strip 'mpv://play/' prefix (11 chars) and URL-decode
+$encoded = $url.Substring(11)
+$decoded = [System.Uri]::UnescapeDataString($encoded)
+& mpv $decoded
+'@
+$handlerScript | Out-File -FilePath "$handlerDir\mpv-handler.ps1" -Encoding UTF8
+
+# Register the mpv:// protocol
 New-Item -Path "HKCR:\mpv" -Force | Out-Null
 Set-ItemProperty -Path "HKCR:\mpv" -Name "(Default)" -Value "URL:mpv Protocol"
 Set-ItemProperty -Path "HKCR:\mpv" -Name "URL Protocol" -Value ""
 New-Item -Path "HKCR:\mpv\shell\open\command" -Force | Out-Null
-Set-ItemProperty -Path "HKCR:\mpv\shell\open\command" -Name "(Default)" -Value "`"$mpvPath`" `"%1`""
-Write-Host "mpv:// protocol registered successfully!"
+$cmd = "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$handlerDir\mpv-handler.ps1`" `"%1`""
+Set-ItemProperty -Path "HKCR:\mpv\shell\open\command" -Name "(Default)" -Value $cmd
+
+Write-Host "mpv:// protocol handler installed successfully!" -ForegroundColor Green
+Write-Host "Handler script: $handlerDir\mpv-handler.ps1"
 ```
 
 After setup, when you select MPV as your player and click the button, it will launch MPV with the Plex stream URL.
