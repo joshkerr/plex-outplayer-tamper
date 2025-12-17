@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Plex Outplayer
-// @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer or SenPlayer for iOS. Works on episodes, movies, whole seasons, and entire shows.
+// @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer for iOS, or MPV for Mac/Windows. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.9.0
+// @version      1.10.0
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -51,6 +51,16 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			buildUri: function(uri) {
 				const encodedUri = encodeURIComponent(uri);
 				return `senplayer://x-callback-url/play?url=${encodedUri}`;
+			}
+		},
+		mpv: {
+			name: "MPV",
+			// MPV requires a URL protocol handler to be registered on the system
+			// Mac: Use Homebrew 'brew install stolendata/mpv-handler/mpv-handler' or similar
+			// Windows: Use mpv-handler or register mpv:// protocol manually
+			buildUri: function(uri) {
+				const encodedUri = encodeURIComponent(uri);
+				return `mpv://play?url=${encodedUri}`;
 			}
 		}
 	};
