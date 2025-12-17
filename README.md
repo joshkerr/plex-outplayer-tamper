@@ -9,7 +9,7 @@ Places an external player button on the Plex website to stream videos through Ou
 
 ## MPV Setup
 
-MPV requires a URL protocol handler to be registered on your system before it can be launched from the browser.
+MPV requires a URL protocol handler (`plex-mpv://`) to be registered on your system before it can be launched from the browser.
 
 ### macOS
 
@@ -29,7 +29,7 @@ Or if you have the repo cloned:
 ./install-mpv-handler-macos.sh
 ```
 
-This creates an app bundle at `~/Applications/MPV URL Handler.app` that handles `mpv://` URLs.
+This creates an app bundle at `~/Applications/Plex MPV Handler.app` that handles `plex-mpv://` URLs.
 
 **Note:** If macOS blocks the app, go to System Preferences > Security & Privacy and allow it to run.
 
@@ -44,36 +44,7 @@ This creates an app bundle at `~/Applications/MPV URL Handler.app` that handles 
 **Or** run the PowerShell script directly **as Administrator**:
 
 ```powershell
-# MPV Protocol Handler Setup for Windows (Run as Administrator)
-# This creates a PowerShell-based handler that decodes base64-encoded URLs
-
-$mpvPath = (Get-Command mpv.exe -ErrorAction SilentlyContinue).Source
-if (-not $mpvPath) { Write-Error "mpv.exe not found in PATH. Install MPV first."; exit 1 }
-
-# Create handler script directory
-$handlerDir = "$env:LOCALAPPDATA\mpv-handler"
-New-Item -Path $handlerDir -ItemType Directory -Force | Out-Null
-
-# Create the handler script that decodes the URL and launches MPV
-$handlerScript = @'
-param([string]$url)
-# Strip 'mpv://b64/' prefix (10 chars) and base64-decode
-$base64 = $url.Substring(10)
-$decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64))
-& mpv $decoded
-'@
-$handlerScript | Out-File -FilePath "$handlerDir\mpv-handler.ps1" -Encoding UTF8
-
-# Register the mpv:// protocol
-New-Item -Path "HKCR:\mpv" -Force | Out-Null
-Set-ItemProperty -Path "HKCR:\mpv" -Name "(Default)" -Value "URL:mpv Protocol"
-Set-ItemProperty -Path "HKCR:\mpv" -Name "URL Protocol" -Value ""
-New-Item -Path "HKCR:\mpv\shell\open\command" -Force | Out-Null
-$cmd = "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$handlerDir\mpv-handler.ps1`" `"%1`""
-Set-ItemProperty -Path "HKCR:\mpv\shell\open\command" -Name "(Default)" -Value $cmd
-
-Write-Host "mpv:// protocol handler installed successfully!" -ForegroundColor Green
-Write-Host "Handler script: $handlerDir\mpv-handler.ps1"
+.\install-mpv-handler.ps1
 ```
 
 After setup, when you select MPV as your player and click the button, it will launch MPV with the Plex stream URL.

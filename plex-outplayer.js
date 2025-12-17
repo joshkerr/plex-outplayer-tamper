@@ -56,13 +56,13 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		mpv: {
 			name: "MPV",
 			// MPV requires a URL protocol handler to be registered on the system
-			// Mac: Use Homebrew 'brew install stolendata/mpv-handler/mpv-handler' or similar
-			// Windows: See README for PowerShell setup script
+			// Uses plex-mpv:// to avoid conflicts with mpv's built-in URL handler
+			// Mac/Windows: See README for setup scripts
 			buildUri: function(uri) {
 				// Use base64 encoding to avoid Windows/browser mangling URL special characters
 				// The handler script will decode it before passing to mpv
 				const base64Uri = btoa(uri);
-				return `mpv://b64/${base64Uri}`;
+				return `plex-mpv://${base64Uri}`;
 			}
 		}
 	};

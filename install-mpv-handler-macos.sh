@@ -18,13 +18,14 @@ fi
 MPV_PATH=$(which mpv)
 echo "Found mpv at: $MPV_PATH"
 
-APP_NAME="MPV URL Handler"
+APP_NAME="Plex MPV Handler"
 APP_DIR="$HOME/Applications/$APP_NAME.app"
 
 echo "Creating app bundle at: $APP_DIR"
 
 # Clean up existing installation
 rm -rf "$APP_DIR"
+rm -rf "$HOME/Applications/MPV URL Handler.app"  # Remove old version
 
 # Create AppleScript source file
 SCRIPT_SOURCE=$(mktemp)
@@ -35,8 +36,8 @@ on open location theURL
     do shell script "echo '=== '$(date)' ===' >> " & quoted form of logFile
     do shell script "echo 'Received: " & theURL & "' >> " & quoted form of logFile
 
-    -- Strip 'mpv://b64/' prefix (first 10 characters)
-    set base64Part to text 11 thru -1 of theURL
+    -- Strip 'plex-mpv://' prefix (first 11 characters)
+    set base64Part to text 12 thru -1 of theURL
     do shell script "echo 'Base64: " & base64Part & "' >> " & quoted form of logFile
 
     -- Decode base64
@@ -67,19 +68,19 @@ PLIST="$APP_DIR/Contents/Info.plist"
 
 /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string 'MPV Protocol'" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string 'Plex MPV Protocol'" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string mpv" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string plex-mpv" "$PLIST" 2>/dev/null || true
 
 # Register the URL handler
 echo "Registering URL handler..."
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR" 2>/dev/null || true
 
 echo ""
-echo "✓ MPV URL Handler installed successfully!"
+echo "✓ Plex MPV Handler installed successfully!"
 echo ""
 echo "The handler is installed at: $APP_DIR"
 echo "You can now use MPV as your player in Plex Outplayer."
 echo ""
-echo "Testing with: open \"mpv://b64/aHR0cHM6Ly9leGFtcGxlLmNvbQ==\""
+echo "Testing with: open \"plex-mpv://aHR0cHM6Ly9leGFtcGxlLmNvbQ==\""
 echo "Check ~/mpv-handler-debug.log for output"
