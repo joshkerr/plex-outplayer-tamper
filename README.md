@@ -25,7 +25,9 @@ Or manually register the `mpv://` protocol using a third-party tool like [open-m
 
 **Prerequisites:** Install MPV first via [Chocolatey](https://community.chocolatey.org/packages/mpvio) (`choco install mpvio`) or download from [mpv.io](https://mpv.io/installation/). Make sure `mpv.exe` is in your PATH (verify with `mpv --version`).
 
-Run this PowerShell script **as Administrator** to set up the `mpv://` protocol handler:
+**Quick Install:** Download and run [`install-mpv-handler.bat`](install-mpv-handler.bat) as Administrator.
+
+**Or** run this PowerShell script **as Administrator** to set up the `mpv://` protocol handler:
 
 ```powershell
 # MPV Protocol Handler Setup for Windows (Run as Administrator)
