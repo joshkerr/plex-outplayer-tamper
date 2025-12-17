@@ -33,7 +33,7 @@ Or manually register the `mpv://` protocol using a third-party tool like [open-m
 
 ```powershell
 # MPV Protocol Handler Setup for Windows (Run as Administrator)
-# This creates a PowerShell-based handler that properly decodes URLs
+# This creates a PowerShell-based handler that decodes base64-encoded URLs
 
 $mpvPath = (Get-Command mpv.exe -ErrorAction SilentlyContinue).Source
 if (-not $mpvPath) { Write-Error "mpv.exe not found in PATH. Install MPV first."; exit 1 }
@@ -45,9 +45,9 @@ New-Item -Path $handlerDir -ItemType Directory -Force | Out-Null
 # Create the handler script that decodes the URL and launches MPV
 $handlerScript = @'
 param([string]$url)
-# Strip 'mpv://play/' prefix (11 chars) and URL-decode
-$encoded = $url.Substring(11)
-$decoded = [System.Uri]::UnescapeDataString($encoded)
+# Strip 'mpv://b64/' prefix (10 chars) and base64-decode
+$base64 = $url.Substring(10)
+$decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64))
 & mpv $decoded
 '@
 $handlerScript | Out-File -FilePath "$handlerDir\mpv-handler.ps1" -Encoding UTF8

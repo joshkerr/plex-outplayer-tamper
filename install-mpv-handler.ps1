@@ -26,9 +26,9 @@ New-Item -Path $handlerDir -ItemType Directory -Force | Out-Null
 # Create the handler script that decodes the URL and launches MPV
 $handlerScript = @'
 param([string]$url)
-# Strip 'mpv://play/' prefix (11 chars) and URL-decode
-$encoded = $url.Substring(11)
-$decoded = [System.Uri]::UnescapeDataString($encoded)
+# Strip 'mpv://b64/' prefix (10 chars) and base64-decode
+$base64 = $url.Substring(10)
+$decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64))
 & mpv $decoded
 '@
 $handlerScript | Out-File -FilePath "$handlerDir\mpv-handler.ps1" -Encoding UTF8
