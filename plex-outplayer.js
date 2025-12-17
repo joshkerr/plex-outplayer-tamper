@@ -59,10 +59,10 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			// Mac: Use Homebrew 'brew install stolendata/mpv-handler/mpv-handler' or similar
 			// Windows: See README for PowerShell setup script
 			buildUri: function(uri) {
-				// URL must be encoded to prevent Windows from mangling special characters
+				// Use base64 encoding to avoid Windows/browser mangling URL special characters
 				// The handler script will decode it before passing to mpv
-				const encodedUri = encodeURIComponent(uri);
-				return `mpv://play/${encodedUri}`;
+				const base64Uri = btoa(uri);
+				return `mpv://b64/${base64Uri}`;
 			}
 		}
 	};
