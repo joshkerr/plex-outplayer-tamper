@@ -31,27 +31,18 @@ rm -rf "$HOME/Applications/MPV URL Handler.app"  # Remove old version
 SCRIPT_SOURCE=$(mktemp)
 cat > "$SCRIPT_SOURCE" << 'APPLESCRIPT'
 on open location theURL
-    -- Log for debugging
-    set logFile to (POSIX path of (path to home folder)) & "mpv-handler-debug.log"
-    do shell script "echo '=== '$(date)' ===' >> " & quoted form of logFile
-    do shell script "echo 'Received: " & theURL & "' >> " & quoted form of logFile
-
     -- Strip 'plex-mpv://' prefix (first 11 characters)
     set base64Part to text 12 thru -1 of theURL
-    do shell script "echo 'Base64: " & base64Part & "' >> " & quoted form of logFile
 
     -- Decode base64
     set decodedURL to do shell script "echo " & quoted form of base64Part & " | base64 -d"
-    do shell script "echo 'Decoded: " & decodedURL & "' >> " & quoted form of logFile
 
     -- Launch mpv (try both possible locations)
     try
-        do shell script "/opt/homebrew/bin/mpv " & quoted form of decodedURL & " >> " & quoted form of logFile & " 2>&1 &"
+        do shell script "/opt/homebrew/bin/mpv " & quoted form of decodedURL & " > /dev/null 2>&1 &"
     on error
         try
-            do shell script "/usr/local/bin/mpv " & quoted form of decodedURL & " >> " & quoted form of logFile & " 2>&1 &"
-        on error errMsg
-            do shell script "echo 'Error: " & errMsg & "' >> " & quoted form of logFile
+            do shell script "/usr/local/bin/mpv " & quoted form of decodedURL & " > /dev/null 2>&1 &"
         end try
     end try
 end open location
@@ -81,6 +72,3 @@ echo "✓ Plex MPV Handler installed successfully!"
 echo ""
 echo "The handler is installed at: $APP_DIR"
 echo "You can now use MPV as your player in Plex Outplayer."
-echo ""
-echo "Testing with: open \"plex-mpv://aHR0cHM6Ly9leGFtcGxlLmNvbQ==\""
-echo "Check ~/mpv-handler-debug.log for output"
