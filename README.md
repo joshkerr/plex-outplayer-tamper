@@ -23,11 +23,32 @@ Or manually register the `mpv://` protocol using a third-party tool like [open-m
 
 ### Windows
 
-1. Download and install [mpv-handler](https://github.com/nicetip/open-mpv) or a similar URL protocol handler for MPV
-2. Alternatively, you can manually register the `mpv://` protocol in the Windows Registry:
-   - Create a registry key at `HKEY_CLASSES_ROOT\mpv`
-   - Set the default value to `URL:mpv Protocol`
-   - Add a string value `URL Protocol` (empty)
-   - Create `shell\open\command` subkey with default value pointing to your mpv executable with `"%1"` parameter
+**Prerequisites:** Install MPV first via [Chocolatey](https://community.chocolatey.org/packages/mpvio) (`choco install mpvio`) or download from [mpv.io](https://mpv.io/installation/). Make sure `mpv.exe` is in your PATH.
+
+**Option 1: mpv-url-proto (Recommended)**
+
+Download and run the installer from [mpv-url-proto](https://github.com/b01o/mpv-url-proto):
+
+```powershell
+# Download and run the installer (Run as Administrator)
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/b01o/mpv-url-proto/main/mpv-url-proto-install.bat" -OutFile "$env:TEMP\mpv-url-proto-install.bat"; Start-Process -FilePath "$env:TEMP\mpv-url-proto-install.bat" -Verb RunAs
+```
+
+**Option 2: Manual Registry Setup**
+
+Run this PowerShell script as Administrator to register the `mpv://` protocol:
+
+```powershell
+# Register mpv:// protocol handler (Run as Administrator)
+$mpvPath = (Get-Command mpv.exe -ErrorAction SilentlyContinue).Source
+if (-not $mpvPath) { Write-Error "mpv.exe not found in PATH"; exit 1 }
+
+New-Item -Path "HKCR:\mpv" -Force | Out-Null
+Set-ItemProperty -Path "HKCR:\mpv" -Name "(Default)" -Value "URL:mpv Protocol"
+Set-ItemProperty -Path "HKCR:\mpv" -Name "URL Protocol" -Value ""
+New-Item -Path "HKCR:\mpv\shell\open\command" -Force | Out-Null
+Set-ItemProperty -Path "HKCR:\mpv\shell\open\command" -Name "(Default)" -Value "`"$mpvPath`" `"%1`""
+Write-Host "mpv:// protocol registered successfully!"
+```
 
 After setup, when you select MPV as your player and click the button, it will launch MPV with the Plex stream URL.

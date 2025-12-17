@@ -57,10 +57,10 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			name: "MPV",
 			// MPV requires a URL protocol handler to be registered on the system
 			// Mac: Use Homebrew 'brew install stolendata/mpv-handler/mpv-handler' or similar
-			// Windows: Use mpv-handler or register mpv:// protocol manually
+			// Windows: Download mpv-url-proto from https://github.com/b01o/mpv-url-proto
 			buildUri: function(uri) {
-				const encodedUri = encodeURIComponent(uri);
-				return `mpv://play?url=${encodedUri}`;
+				// Simple mpv://URL format - most handlers strip 'mpv://' and pass URL to mpv
+				return `mpv://${uri}`;
 			}
 		}
 	};
