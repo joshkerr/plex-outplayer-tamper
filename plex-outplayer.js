@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Plex Outplayer
-// @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer for iOS, or MPV for Mac/Windows. Works on episodes, movies, whole seasons, and entire shows.
+// @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.10.0
+// @version      1.11.0
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -63,6 +63,17 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 				// The handler script will decode it before passing to mpv
 				const base64Uri = btoa(uri);
 				return `plex-mpv://${base64Uri}`;
+			}
+		},
+		iina: {
+			name: "IINA",
+			// IINA is a macOS-only media player (built on mpv)
+			// Requires URL protocol handler to be registered on the system
+			// macOS: See README for setup script
+			buildUri: function(uri) {
+				// Use base64 encoding like MPV to avoid URL mangling
+				const base64Uri = btoa(uri);
+				return `plex-iina://${base64Uri}`;
 			}
 		}
 	};
