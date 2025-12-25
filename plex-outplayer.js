@@ -2,7 +2,7 @@
 // @name         Plex Outplayer
 // @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.12.1
+// @version      1.12.2
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -1720,12 +1720,13 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}, { passive: false });
 
 		domElement.addEventListener("touchmove", function(event) {
-			// Cancel long press if finger moves too much
-			const deltaX = Math.abs(event.touches[0].clientX - touchStartX);
-			const deltaY = Math.abs(event.touches[0].clientY - touchStartY);
-			if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
-				clearTimeout(longPressTimer);
-				longPressFired = false;
+			// Cancel long press if finger moves too much, but only if timer hasn't fired yet
+			if (!longPressFired) {
+				const deltaX = Math.abs(event.touches[0].clientX - touchStartX);
+				const deltaY = Math.abs(event.touches[0].clientY - touchStartY);
+				if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
+					clearTimeout(longPressTimer);
+				}
 			}
 		});
 
