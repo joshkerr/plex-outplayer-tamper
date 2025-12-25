@@ -2,7 +2,7 @@
 // @name         Plex Outplayer
 // @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.11.0
+// @version      1.12.0
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -1529,6 +1529,11 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		// Apply custom CSS first
 		downloadButton.style.cssText = domElementStyle;
 		
+		// Prevent iOS long-press context menu
+		downloadButton.style.webkitTouchCallout = 'none';
+		downloadButton.style.webkitUserSelect = 'none';
+		downloadButton.style.touchAction = 'manipulation';
+		
 		// Match the font used by the text content of the injection point
 		// We traverse the element and select the first text node, then use its parent
 		let textNode = (function findTextNode(parent) {
@@ -1612,11 +1617,8 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		};
 		domElement.addEventListener("click", downloadFunction);
 
-		// Right-click to show player selection context menu
-		domElement.addEventListener("contextmenu", function(event) {
-			event.preventDefault();
-			event.stopPropagation();
-
+		// Function to show player selection context menu
+		const showPlayerMenu = function(clientX, clientY) {
 			// Remove any existing context menu
 			const existingMenu = document.getElementById(`${domPrefix}playerContextMenu`);
 			if (existingMenu) {
@@ -1628,8 +1630,8 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			menu.id = `${domPrefix}playerContextMenu`;
 			menu.style.cssText = `
 				position: fixed;
-				left: ${event.clientX}px;
-				top: ${event.clientY}px;
+				left: ${clientX}px;
+				top: ${clientY}px;
 				background: #3f3f42;
 				border-radius: 6px;
 				box-shadow: 0 2px 10px rgba(0,0,0,0.5);
@@ -1661,27 +1663,83 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 					domElement.innerHTML = getDomElementInnerHTML();
 					menu.remove();
 				});
+				option.addEventListener("touchend", function(e) {
+					e.preventDefault();
+					e.stopPropagation();
+					setSelectedPlayer(playerKey);
+					domElement.innerHTML = getDomElementInnerHTML();
+					menu.remove();
+				});
 				menu.appendChild(option);
 			}
 
 			document.body.appendChild(menu);
 
-			// Close menu when clicking elsewhere
+			// Close menu when clicking/tapping elsewhere
 			const closeMenu = function(e) {
 				if (!menu.contains(e.target)) {
 					menu.remove();
 					document.removeEventListener("click", closeMenu);
+					document.removeEventListener("touchend", closeMenu);
 				}
 			};
-			setTimeout(() => document.addEventListener("click", closeMenu), 0);
+			setTimeout(() => {
+				document.addEventListener("click", closeMenu);
+				document.addEventListener("touchend", closeMenu);
+			}, 0);
+		};
+
+		// Right-click to show player selection context menu
+		domElement.addEventListener("contextmenu", function(event) {
+			event.preventDefault();
+			event.stopPropagation();
+			showPlayerMenu(event.clientX, event.clientY);
+		});
+
+		// Long press for touch devices (iPad/iPhone)
+		let longPressTimer = null;
+		let touchStartX = 0;
+		let touchStartY = 0;
+		const LONG_PRESS_DURATION = 500; // milliseconds
+		const MOVE_THRESHOLD = 10; // pixels
+
+		domElement.addEventListener("touchstart", function(event) {
+			touchStartX = event.touches[0].clientX;
+			touchStartY = event.touches[0].clientY;
+			
+			longPressTimer = setTimeout(function() {
+				// Trigger haptic feedback if available
+				if (navigator.vibrate) {
+					navigator.vibrate(50);
+				}
+				event.preventDefault();
+				showPlayerMenu(touchStartX, touchStartY);
+			}, LONG_PRESS_DURATION);
+		}, { passive: false });
+
+		domElement.addEventListener("touchmove", function(event) {
+			// Cancel long press if finger moves too much
+			const deltaX = Math.abs(event.touches[0].clientX - touchStartX);
+			const deltaY = Math.abs(event.touches[0].clientY - touchStartY);
+			if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
+				clearTimeout(longPressTimer);
+			}
+		});
+
+		domElement.addEventListener("touchend", function(event) {
+			clearTimeout(longPressTimer);
+		});
+
+		domElement.addEventListener("touchcancel", function(event) {
+			clearTimeout(longPressTimer);
 		});
 
 		// Add the filesize on hover, if available
 		if (Object.hasOwn(serverData.servers[clientId].mediaData[metadataId], "filesize")) {
 			let filesize = makeFilesize(serverData.servers[clientId].mediaData[metadataId].filesize);
-			domElement.title = `${filesize} (right-click to change player)`;
+			domElement.title = `${filesize} (right-click or long-press to change player)`;
 		} else {
-			domElement.title = "Right-click to change player";
+			domElement.title = "Right-click or long-press to change player";
 		}
 
 		return true;
