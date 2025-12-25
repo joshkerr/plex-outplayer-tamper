@@ -2,7 +2,7 @@
 // @name         Plex Outplayer
 // @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.12.0
+// @version      1.12.1
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -1698,6 +1698,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 
 		// Long press for touch devices (iPad/iPhone)
 		let longPressTimer = null;
+		let longPressFired = false;
 		let touchStartX = 0;
 		let touchStartY = 0;
 		const LONG_PRESS_DURATION = 500; // milliseconds
@@ -1706,13 +1707,14 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		domElement.addEventListener("touchstart", function(event) {
 			touchStartX = event.touches[0].clientX;
 			touchStartY = event.touches[0].clientY;
+			longPressFired = false;
 			
 			longPressTimer = setTimeout(function() {
+				longPressFired = true;
 				// Trigger haptic feedback if available
 				if (navigator.vibrate) {
 					navigator.vibrate(50);
 				}
-				event.preventDefault();
 				showPlayerMenu(touchStartX, touchStartY);
 			}, LONG_PRESS_DURATION);
 		}, { passive: false });
@@ -1723,15 +1725,22 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			const deltaY = Math.abs(event.touches[0].clientY - touchStartY);
 			if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
 				clearTimeout(longPressTimer);
+				longPressFired = false;
 			}
 		});
 
 		domElement.addEventListener("touchend", function(event) {
 			clearTimeout(longPressTimer);
+			// Prevent click event if long press was triggered
+			if (longPressFired) {
+				event.preventDefault();
+				event.stopPropagation();
+			}
 		});
 
 		domElement.addEventListener("touchcancel", function(event) {
 			clearTimeout(longPressTimer);
+			longPressFired = false;
 		});
 
 		// Add the filesize on hover, if available
