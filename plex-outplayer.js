@@ -55,10 +55,10 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		},
 		vidhub: {
 			name: "VidHub",
-			// VidHub uses x-callback-url format
+			// VidHub uses x-callback-url format with open-vidhub:// scheme
 			buildUri: function(uri) {
 				const encodedUri = encodeURIComponent(uri);
-				return `vidhub://x-callback-url/play?url=${encodedUri}`;
+				return `open-vidhub://x-callback-url/open?url=${encodedUri}`;
 			}
 		},
 		mpv: {
