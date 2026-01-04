@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Plex Outplayer
-// @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
+// @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer, VidHub for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.12.3
+// @version      1.12.4
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -51,6 +51,14 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			buildUri: function(uri) {
 				const encodedUri = encodeURIComponent(uri);
 				return `senplayer://x-callback-url/play?url=${encodedUri}`;
+			}
+		},
+		vidhub: {
+			name: "VidHub",
+			// VidHub uses x-callback-url format
+			buildUri: function(uri) {
+				const encodedUri = encodeURIComponent(uri);
+				return `vidhub://x-callback-url/play?url=${encodedUri}`;
 			}
 		},
 		mpv: {
