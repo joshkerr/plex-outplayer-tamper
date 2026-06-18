@@ -2,7 +2,7 @@
 // @name         Plex Outplayer
 // @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer, VidHub for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.12.5
+// @version      1.12.6
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
@@ -34,6 +34,17 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	const injectionElement    = "button[data-testid=preplay-play]"; // Play button
 	const injectPosition      = "after";
 	const domElementStyle     = "";
+
+	function base64UrlEncode(value) {
+		return btoa(value)
+			.replace(/\+/g, "-")
+			.replace(/\//g, "_")
+			.replace(/=+$/g, "");
+	}
+
+	function isWindows() {
+		return /\bWindows\b/i.test(navigator.userAgent);
+	}
 
 	// Player configurations
 	const players = {
@@ -67,8 +78,13 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			// Uses plex-mpv:// to avoid conflicts with mpv's built-in URL handler
 			// Mac/Windows: See README for setup scripts
 			buildUri: function(uri) {
-				// Use base64 encoding to avoid Windows/browser mangling URL special characters
-				// The handler script will decode it before passing to mpv
+				if (isWindows()) {
+					// Keep the encoded URL in the path. Windows may normalize URL hosts,
+					// which can corrupt case-sensitive base64 payloads.
+					const base64Uri = base64UrlEncode(uri);
+					return `plex-mpv://play/${base64Uri}`;
+				}
+
 				const base64Uri = btoa(uri);
 				return `plex-mpv://${base64Uri}`;
 			}
