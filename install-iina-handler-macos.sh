@@ -37,7 +37,14 @@ on open location theURL
     -- Decode base64
     set decodedURL to do shell script "echo " & quoted form of base64Part & " | base64 -d"
 
-    -- Launch IINA with the URL
+    -- SECURITY: the payload is attacker-controllable (any web page can invoke a
+    -- registered protocol). Only accept http(s) URLs so a crafted link can never
+    -- smuggle iina-cli/mpv options such as --mpv-script (arbitrary code execution).
+    if decodedURL does not start with "http://" and decodedURL does not start with "https://" then
+        return
+    end if
+
+    -- Launch IINA with the URL (decodedURL is passed as a single quoted argument)
     do shell script "/Applications/IINA.app/Contents/MacOS/iina-cli --no-stdin " & quoted form of decodedURL & " > /dev/null 2>&1 &"
 end open location
 APPLESCRIPT

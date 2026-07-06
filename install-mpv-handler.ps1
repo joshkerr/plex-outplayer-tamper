@@ -67,11 +67,19 @@ try {
         throw "Unexpected URL format."
     }
 
+    # SECURITY: the payload is attacker-controllable (any web page can invoke a
+    # registered protocol). Only accept http(s) URLs so a crafted link can never
+    # smuggle mpv options such as --script (which would be arbitrary code execution).
+    if ($decoded -notmatch '^(?i)https?://') {
+        throw "Refusing to launch: decoded payload is not an http(s) URL."
+    }
+
     if (-not (Test-Path -LiteralPath $mpvPath)) {
         throw "mpv.exe was not found at the installed path: $mpvPath"
     }
 
-    Start-Process -FilePath $mpvPath -ArgumentList @($decoded)
+    # '--' stops mpv option parsing, so even a URL that looks like a flag is treated as a URL
+    Start-Process -FilePath $mpvPath -ArgumentList @('--', $decoded)
     Write-HandlerLog "Started mpv with decoded URL length $($decoded.Length)."
 } catch {
     Write-HandlerLog "ERROR: $($_.Exception.Message)"
