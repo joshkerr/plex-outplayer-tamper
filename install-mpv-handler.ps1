@@ -28,8 +28,20 @@ $handlerScript = @'
 param([string]$url)
 # Strip 'plex-mpv://' prefix (11 chars) and base64-decode
 $base64 = $url.Substring(11)
-$decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64))
-& mpv $decoded
+try {
+    $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64))
+} catch {
+    # Not valid base64 - refuse to launch anything
+    exit 1
+}
+# SECURITY: the payload is attacker-controllable (any web page can invoke a
+# registered protocol). Only accept http(s) URLs so a crafted link can never
+# smuggle mpv options such as --script (which would be arbitrary code execution).
+if ($decoded -notmatch '^(?i)https?://') {
+    exit 1
+}
+# '--' stops mpv option parsing, so even a URL that looks like a flag is treated as a URL
+& mpv -- $decoded
 '@
 $handlerScript | Out-File -FilePath "$handlerDir\plex-mpv-handler.ps1" -Encoding UTF8
 Write-Host "Created handler script: $handlerDir\plex-mpv-handler.ps1" -ForegroundColor Green

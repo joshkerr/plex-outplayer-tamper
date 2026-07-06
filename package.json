@@ -1,0 +1,21 @@
+{
+  "name": "plex-outplayer-tamper",
+  "version": "1.13.0",
+  "description": "Tampermonkey userscript that adds an external-player button to the Plex web interface.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "test": "node --test",
+    "check:version": "node scripts/check-version-bump.mjs"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joshkerr/plex-outplayer-tamper.git"
+  }
+}

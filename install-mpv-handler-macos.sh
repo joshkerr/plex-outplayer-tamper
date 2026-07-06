@@ -51,11 +51,19 @@ if [ -z "$DECODED_URL" ]; then
     exit 1
 fi
 
-# Launch mpv
+# SECURITY: the payload is attacker-controllable (any web page can invoke a
+# registered protocol). Only accept http(s) URLs so a crafted link can never
+# smuggle mpv options such as --script (which would be arbitrary code execution).
+case "$DECODED_URL" in
+    http://*|https://*) ;;
+    *) exit 1 ;;
+esac
+
+# '--' stops mpv option parsing, so even a URL that looks like a flag is treated as a URL
 if [ -x /opt/homebrew/bin/mpv ]; then
-    /opt/homebrew/bin/mpv "$DECODED_URL" &
+    /opt/homebrew/bin/mpv -- "$DECODED_URL" &
 elif [ -x /usr/local/bin/mpv ]; then
-    /usr/local/bin/mpv "$DECODED_URL" &
+    /usr/local/bin/mpv -- "$DECODED_URL" &
 fi
 HANDLER
 chmod +x "$APP_DIR/Contents/MacOS/applet"

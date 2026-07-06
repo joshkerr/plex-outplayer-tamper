@@ -3,7 +3,7 @@
 ## Project Overview
 
 **Type**: Tampermonkey userscript with platform-specific URL handler installers  
-**Purpose**: Adds an external player button to Plex web interface to stream videos through Outplayer, SenPlayer, MPV, or IINA  
+**Purpose**: Adds an external player button to Plex web interface to stream videos through Outplayer, SenPlayer, VidHub, MPV, or IINA  
 **Language**: JavaScript (userscript), Bash (macOS installers), PowerShell/Batch (Windows installers)  
 **Target Platforms**: Browser (userscript), macOS (MPV/IINA), Windows (MPV), iOS (Outplayer/SenPlayer)
 
@@ -23,7 +23,18 @@
 ## Essential Commands
 
 ### Testing
-**No automated tests exist.** Test manually by:
+
+**Automated (Node, no dependencies to run):**
+```bash
+npm install   # once, for eslint
+npm test      # node --test: unit tests for the pure helpers
+npm run lint  # eslint
+```
+Tests live in `test/` and extract the real pure helpers (`redactUrl`, `makeFilesize`,
+`makeDuration`, `parseUrl`) out of `plex-outplayer.js` and exercise them in a sandbox,
+so they guard the shipped code without duplicating it.
+
+**Manual (still required for anything DOM/player related):**
 1. Installing the userscript in Tampermonkey
 2. Navigating to Plex web interface (https://app.plex.tv/desktop/)
 3. Selecting a media item
@@ -139,7 +150,7 @@ The script is organized as an IIFE (Immediately Invoked Function Expression) wit
 - **Variable naming**: `camelCase` for variables and functions, `PascalCase` for objects/namespaces
 - **Constants**: `SCREAMING_SNAKE_CASE` for true constants (e.g., `DOM_OBSERVER_MAX_RETRIES`)
 - **Prefixing**: All injected DOM elements use random `domPrefix` to avoid conflicts with Plex
-- **Object organization**: Related functions grouped into objects (e.g., `modal.*`, `serverData.*`, `download.*`)
+- **Object organization**: Related functions grouped into objects (e.g., `modal.*`, `serverData.*`, `playback.*`)
 - **Async/await**: Preferred over raw Promises
 - **Error handling**: Centralized via `errorHandle()` function
 
@@ -384,13 +395,13 @@ This is a hypothetical scenario - there are no edit operations in current workfl
 ## Important Caveats
 
 1. **No TypeScript**: Pure JavaScript, no type checking
-2. **No Build System**: Single-file userscript, no bundling/minification
-3. **No Package Manager**: No npm/package.json - all code is self-contained
-4. **No Linting/Formatting**: No ESLint, Prettier, or similar tools configured
-5. **No CI/CD**: Manual testing required
-6. **No Versioning Strategy**: Update `@version` manually in userscript header
+2. **No Build System**: Single-file userscript, no bundling/minification - `plex-outplayer.js` ships as-is
+3. **Dev tooling is Node-only**: `package.json` exists for ESLint + tests; the userscript itself has no runtime dependencies
+4. **Linting**: ESLint flat config (`eslint.config.js`), run via `npm run lint`
+5. **CI**: GitHub Actions (`.github/workflows/ci.yml`) runs lint + tests on push/PR and enforces an `@version` bump when `plex-outplayer.js` changes
+6. **Versioning**: Bump `@version` manually in the userscript header; CI fails the PR if you forget. `@updateURL`/`@downloadURL` point at `main` so installed users auto-update
 7. **Platform-Specific**: macOS installers won't work on Windows and vice versa
-8. **Plex-Specific**: Tightly coupled to Plex web interface DOM structure - may break on Plex updates
+8. **Plex-Specific**: Tightly coupled to Plex web interface DOM structure - may break on Plex updates (fallback selectors + a console watchdog warning mitigate, but don't eliminate, this)
 9. **Browser Extension Required**: Requires Tampermonkey (or similar userscript manager)
 
 ## Adding New Features

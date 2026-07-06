@@ -2,13 +2,17 @@
 // @name         Plex Outplayer
 // @description  Adds an external player button to the Plex desktop interface. Plays media directly in Outplayer, SenPlayer, VidHub for iOS, MPV for Mac/Windows, or IINA for Mac. Works on episodes, movies, whole seasons, and entire shows.
 // @author       Mow (modified by Josh)
-// @version      1.12.5
+// @version      1.13.0
 // @license      MIT
 // @grant        none
 // @match        https://app.plex.tv/desktop/
 // @include      https://*.*.plex.direct:32400/web/index.html*
 // @run-at       document-start
 // @namespace    https://greasyfork.org/users/1260133
+// @homepageURL  https://github.com/joshkerr/plex-outplayer-tamper
+// @supportURL   https://github.com/joshkerr/plex-outplayer-tamper/issues
+// @updateURL    https://raw.githubusercontent.com/joshkerr/plex-outplayer-tamper/main/plex-outplayer.js
+// @downloadURL  https://raw.githubusercontent.com/joshkerr/plex-outplayer-tamper/main/plex-outplayer.js
 // ==/UserScript==
 
 
@@ -31,9 +35,27 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	const domPrefix = `USERJSINJECTED-${randToken()}_`.toLowerCase();
 	
 	// Settings of what element to clone, where to inject it, and any additional CSS to use
-	const injectionElement    = "button[data-testid=preplay-play]"; // Play button
+	// The script is tightly coupled to Plex's DOM, which changes without notice. Provide an
+	// ordered list of selectors so a single markup tweak on Plex's side is less likely to
+	// break injection outright: the first selector that matches wins.
+	const injectionElements   = [
+		"button[data-testid=preplay-play]",       // Current Plex "Play" button
+		"button[data-testid=preplayPlayButton]",  // Alternate casing seen in some builds
+		"[data-testid=preplay-play]",             // In case Plex swaps the tag away from <button>
+	];
 	const injectPosition      = "after";
 	const domElementStyle     = "";
+
+	// Find the first injection point that currently exists in the DOM, or null
+	function findInjectionPoint() {
+		for (const selector of injectionElements) {
+			const found = document.querySelector(selector);
+			if (found) {
+				return found;
+			}
+		}
+		return null;
+	}
 
 	// Player configurations
 	const players = {
@@ -640,7 +662,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		let clientId = modal.clientId.value;
 		for (let checkbox of modal.itemCheckboxes) {
 			if (checkbox.checked) {
-				download.fromMedia(clientId, checkbox.value);
+				playback.fromMedia(clientId, checkbox.value);
 			}
 		}
 		modal.close();
@@ -767,15 +789,22 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	// Limit how aggressively we retry attaching the observer when the DOM isn't ready
 	const DOM_OBSERVER_MAX_RETRIES = 10;
 	const DOM_OBSERVER_RETRY_DELAY_MS = 50; // Small delay to wait for DOM nodes to appear
+	// If we're on a media page but never manage to inject, Plex's DOM likely changed.
+	// Warn loudly (once) so users can file a report instead of silently getting nothing.
+	const DOM_OBSERVER_WATCHDOG_MS = 8000;
+	const issuesUrl = "https://github.com/joshkerr/plex-outplayer-tamper/issues";
 	
 	// Check to see if we need to modify the DOM, do so if yes
 	DOMObserver.callback = async function() {
 		// Detect the presence of the injection point first
-		const injectionPoint = document.querySelector(injectionElement);  
+		const injectionPoint = findInjectionPoint();
 		if (!injectionPoint) {
 			return;
 		}
-		
+
+		// We found the injection point, so the DOM is behaving as expected
+		DOMObserver.clearWatchdog();
+
 		// We can always stop observing when we have found the injection point
 		// Note: This relies on the fact that the page does not mutate without also
 		//       triggering hashchange. This is currently true (most of the time) but
@@ -838,6 +867,37 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	DOMObserver.stop = function() {
 		DOMObserver.mo.disconnect();
+		DOMObserver.clearWatchdog();
+	};
+
+	// Watchdog: if we're observing a matching media page but the injection point never
+	// appears, Plex most likely changed its markup. Emit one distinctive warning.
+	DOMObserver.watchdogTimer = null;
+	DOMObserver.watchdogWarned = false;
+
+	DOMObserver.startWatchdog = function() {
+		if (DOMObserver.watchdogTimer !== null || DOMObserver.watchdogWarned) {
+			return;
+		}
+		DOMObserver.watchdogTimer = setTimeout(function() {
+			DOMObserver.watchdogTimer = null;
+			// Only warn if we're still on a media page and the button truly never injected
+			if (parseUrl() && !document.getElementById(`${domPrefix}ExternalPlayerButton`)) {
+				DOMObserver.watchdogWarned = true;
+				errorHandle(
+					`Could not find a Plex play button to attach to after ${DOM_OBSERVER_WATCHDOG_MS}ms. ` +
+					`Plex's page markup may have changed. Tried selectors: ${injectionElements.join(", ")}. ` +
+					`Please report this at ${issuesUrl}`
+				);
+			}
+		}, DOM_OBSERVER_WATCHDOG_MS);
+	};
+
+	DOMObserver.clearWatchdog = function() {
+		if (DOMObserver.watchdogTimer !== null) {
+			clearTimeout(DOMObserver.watchdogTimer);
+			DOMObserver.watchdogTimer = null;
+		}
 	};
 	
 	
@@ -1184,7 +1244,6 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 			resolution : "?",
 			runtimeMS  : -1,
 			viewed     : false,
-		//	letterboxd : false,
 		}
 		
 		// Replace forward slashes with backslashes, then use the last backslash
@@ -1220,19 +1279,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		if (Object.hasOwn(mediaObject, "viewCount") && mediaObject.viewCount !== 0) {
 			fileInfo.viewed = true;
 		}
-		
-		/*
-		if (Object.hasOwn(mediaObject, "Guid")) {
-			for (let i = 0; i < mediaObject.Guid.length; i++) {
-				let id = mediaObject.Guid[i].id;
-				if (id.startsWith("imdb://") || id.startsWith("tmdb://")) {
-					fileInfo.letterboxd = `https://letterboxd.com/${id.slice(0,4)}/${id.slice(7)}`;
-					break;
-				}
-			}
-		}
-		*/
-		
+
 		serverData.updateMediaDirectly(clientId, mediaObject.ratingKey, fileInfo);
 	};
 	
@@ -1250,18 +1297,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		}
 		
 		const recursionPromises = [];
-		
-		/*
-		// Possible better method than detecting /allLeaves vs /children
-		let continueRecursion = true;
-		if (Object.hasOwn(responseJSON.MediaContainer, "Directory")) {
-			continueRecursion = false;
-			let nextPath = responseJSON.MediaContainer.Directory[0].key;
-			let recursion = serverData.recurseMediaApi(clientId, nextPath, topPromise, null);
-			recursionPromises.push(recursion);
-		}
-		*/
-		
+
 		for (let i = 0; i < responseJSON.MediaContainer.Metadata.length; i++) {
 			let mediaObject = responseJSON.MediaContainer.Metadata[i];
 			
@@ -1399,6 +1435,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		
 		// URL matches, observe the DOM for when the injection point loads
 		DOMObserver.observe();
+		DOMObserver.startWatchdog();
 		
 		// Create empty media entry early
 		serverData.updateMediaDirectly(urlIds.clientId, urlIds.metadataId, {});
@@ -1413,16 +1450,13 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	
 	
 	
-	let download = {};
-	
-	download.frameClass = `${domPrefix}downloadFrame`;
-	download.trigger = document.createElement("a");
-	
-	// Live collection of frames
-	download.frames = document.getElementsByClassName(download.frameClass);
-	
+	// Playback namespace: turns a Plex media item into a stream URL and hands it to the
+	// selected external player. (Historically this "downloaded" via hidden iframes; it now
+	// just opens the player's custom URL scheme, hence the leftover naming is gone.)
+	let playback = {};
+
 	// Open a URL in the selected external player
-	download.fromUri = function(uri, filename) {
+	playback.fromUri = function(uri, filename) {
 		// Build the player-specific URI using the selected player's configuration
 		const playerUri = players[selectedPlayer].buildUri(uri);
 
@@ -1430,16 +1464,8 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		window.open(playerUri, '_blank');
 	};
 	
-	// Clean up old DOM elements from previous downloads, if needed
-	download.cleanUp = function() {
-		// There is no way to detect when the download dialog is closed, so just clean up here to prevent DOM clutter
-		while (download.frames.length !== 0) {
-			download.frames[0].remove();
-		}
-	};
-	
 	// Assemble streaming URI from key and base URI
-	download.makeUri = function(clientId, metadataId) {
+	playback.makeUri = function(clientId, metadataId) {
 		const key         = serverData.servers[clientId].mediaData[metadataId].key;
 		const baseUri     = serverData.servers[clientId].baseUri;
 		const accessToken = serverData.servers[clientId].accessToken;
@@ -1466,7 +1492,7 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 	};
 	
 	// Mark a media item as in-progress in Plex so it appears in "Continue Watching"
-	download.markAsInProgress = function(clientId, metadataId) {
+	playback.markAsInProgress = function(clientId, metadataId) {
 		// Get the required data
 		const baseUri = serverData.servers[clientId].baseUri;
 		const accessToken = serverData.servers[clientId].accessToken;
@@ -1497,27 +1523,27 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		});
 	};
 
-	download.fromMedia = function(clientId, metadataId) {
+	playback.fromMedia = function(clientId, metadataId) {
 		if (Object.hasOwn(serverData.servers[clientId].mediaData[metadataId], "key")) {
 			// Mark this media as in-progress in Plex
-			download.markAsInProgress(clientId, metadataId);
+			playback.markAsInProgress(clientId, metadataId);
 
-			const uri = download.makeUri(clientId, metadataId);
+			const uri = playback.makeUri(clientId, metadataId);
 			const filename = serverData.servers[clientId].mediaData[metadataId].filename;
 
 			if (serverData.servers[clientId].allowsDl === false && uri.startsWith(`${location.protocol}//${location.host}`)) {
 				let url = new URL(uri);
 				url.searchParams.set("download", "1");
-				download.fromUri(url.href, filename);
+				playback.fromUri(url.href, filename);
 			} else {
-				download.fromUri(uri, filename);
+				playback.fromUri(uri, filename);
 			}
 		}
 
 		if (Object.hasOwn(serverData.servers[clientId].mediaData[metadataId], "children")) {
 			for (let i = 0; i < serverData.servers[clientId].mediaData[metadataId].children.length; i++) {
 				let childId = serverData.servers[clientId].mediaData[metadataId].children[i];
-				download.fromMedia(clientId, childId);
+				playback.fromMedia(clientId, childId);
 			}
 		}
 	};
@@ -1613,14 +1639,13 @@ javascript:(d=>{if(!window._PLDLR){let s;window._PLDLR=s=d.createElement`script`
 		// Hook function to button if everything works
 		const downloadFunction = function(event) {
 			event.stopPropagation();
-			download.cleanUp();
-			
+
 			// Open modal box for group media items
 			if (Object.hasOwn(serverData.servers[clientId].mediaData[metadataId], "children")) {
 				modal.open(clientId, metadataId);
 			} else {
 				// Download immediately for single media items
-				download.fromMedia(clientId, metadataId);
+				playback.fromMedia(clientId, metadataId);
 			}
 		};
 		domElement.addEventListener("click", downloadFunction);
