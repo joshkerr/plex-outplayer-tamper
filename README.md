@@ -53,6 +53,20 @@ This creates an app bundle at `~/Applications/Plex MPV Handler.app` that handles
 
 After setup, when you select MPV as your player and click the button, it will launch MPV with the Plex stream URL.
 
+The Windows handler writes diagnostic logs to:
+
+```powershell
+$env:LOCALAPPDATA\plex-mpv-handler\handler.log
+```
+
+If MPV does not open, check that log first. You can also inspect the registered command with:
+
+```powershell
+Get-ItemProperty "Registry::HKEY_CLASSES_ROOT\plex-mpv\shell\open\command"
+```
+
+After updating from an older version, rerun `install-mpv-handler.ps1` as Administrator so Windows uses the current handler.
+
 ## IINA Setup
 
 IINA is a modern macOS media player built on mpv. It requires a URL protocol handler (`plex-iina://`) to be registered on your system.

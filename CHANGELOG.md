@@ -13,6 +13,8 @@ its `@version` header.
   as `--script` (arbitrary code execution). The macOS (`install-mpv-handler-macos.sh`,
   `install-iina-handler-macos.sh`) and Windows (`install-mpv-handler.ps1`) handlers now
   reject anything that is not an `http(s)://` URL and use `--` to stop mpv option parsing.
+  On Windows this hardening sits on top of the reworked 1.12.6 handler (base64url payloads,
+  logging, `Start-Process`), which was still vulnerable to the same option injection.
   **Re-run the installer for your platform to pick up the fix.**
 
 ### Added
@@ -36,6 +38,7 @@ its `@version` header.
 
 ## Prior versions
 
-Earlier releases (≤ 1.12.5) are recorded only in the git history. Notable milestones:
+Earlier releases (≤ 1.12.6) are recorded only in the git history. Notable milestones:
 IINA support, MPV support with per-platform URL handlers, base64 encoding to prevent URL
-mangling, and the switch to a manually-built macOS app bundle.
+mangling, the switch to a manually-built macOS app bundle, and the 1.12.6 Windows handler
+rework (base64url payloads + diagnostic logging).
